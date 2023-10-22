@@ -13,3 +13,7 @@ makedocs(;
                                 edit_link="main",
                                 assets=String[]),
          pages=["Home" => "index.md"])
+
+deploydocs(; repo=Remotes.GitHub("ericphanson", "AllocArrays.jl"),
+           push_preview=true,
+           devbranch="main")
