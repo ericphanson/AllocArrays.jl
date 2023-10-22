@@ -97,7 +97,7 @@ end
     model = DigitsModel()
 
     # Setup some fake data
-    N = 10_000
+    N = 1_000
     data_arr = rand(Float32, 28, 28, N)
 
     # Partition into batches of size 32
