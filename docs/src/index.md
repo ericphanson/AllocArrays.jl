@@ -4,7 +4,8 @@ CurrentModule = AllocArrays
 
 # AllocArrays
 
-Documentation for [AllocArrays](https://github.com/ericphanson/AllocArrays.jl).
+API Documentation for [AllocArrays](https://github.com/ericphanson/AllocArrays.jl).
+See also the README at that link for more examples and notes.
 
 ## Public API
 
