@@ -7,7 +7,7 @@ using Adapt
 # for some piracy
 using StrideArraysCore: StrideArraysCore
 
-export AllocArray, with_bumper
+export AllocArray, with_bumper, with_locked_bumper
 
 include("alloc_interface.jl")
 include("AllocArray.jl")

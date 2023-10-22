@@ -8,6 +8,7 @@ Prototype that attempts to allow usage of [Bumper.jl](https://github.com/MasonPr
 This is accomplished by creating a wrapper type `AllocArray` which dispatches `similar` dynamically to an allocator depending on the contextual scope (using [ScopedValues.jl](https://github.com/vchuravy/ScopedValues.jl)).
 
 Demo:
+
 ```julia
 using AllocArrays, Bumper
 
@@ -45,17 +46,32 @@ a = AllocArray(arr);
 @time bumper_reduction(a) #  0.010638 seconds (16.28 k allocations: 1.129 MiB, 89.93% compilation time)
 @time bumper_reduction(a) #  0.000528 seconds (25 allocations: 800 bytes)
 ```
+
 We can see we brought allocations down from 2.289 MiB to 800 bytes.
 
 For a less-toy example, in `test/flux.jl` we test inference over a Flux model:
 ```julia
 # Baseline: Array
-infer!(predictions, model, data): 2.053936 seconds (59.49 k allocations: 2.841 GiB, 11.71% gc time)
+infer!(predictions, model, data): 1.824578 seconds (59.50 k allocations: 2.841 GiB, 10.10% gc time)
 # Baseline: StrideArray
 stride_data = StrideArray.(data)
-infer!(predictions, model, stride_data): 1.960467 seconds (59.49 k allocations: 2.841 GiB, 11.92% gc time)
+infer!(predictions, model, stride_data): 1.741713 seconds (59.50 k allocations: 2.841 GiB, 11.00% gc time)
 # Using AllocArray:
 alloc_data = AllocArray.(data)
-infer!(predictions, model, alloc_data): 1.630521 seconds (118.34 k allocations: 28.843 MiB)
+infer!(predictions, model, alloc_data): 1.773365 seconds (150.89 k allocations: 30.338 MiB, 0.53% gc time)
 ```
-We can see in this example, we got ~100x less allocation, and slight runtime improvement.
+
+We can see in this example, we got ~100x less allocation, and similar runtime.
+
+### Safety
+
+Before using a bump allocator (`with_bumper` or `with_locked_bumper`) it is recommended the user read the [Bumper.jl README](https://github.com/MasonProtter/Bumper.jl#bumperjl) to understand how it works and what the limitations are.
+
+Note also:
+
+- Just as with all usage of Bumper.jl, the user is responsible for only using Bumper's `@no_escape` when newly allocated arrays truly will not escape
+  - with AllocArrays this can be slightly more subtle, because within `with_bumper` or `with_locked_bumper` block, `similar` calls on `AllocArrays` will allocate using the bump allocator. Thus, one must be sure that none of those allocations leak past a `@no_escape` block. The simplest way to do so is to be sure no allocations of any kind leak past a `@no_escape` block.
+- Calling `with_bumper(f)` (without a buffer argument) is concurrency-safe by virtue of using Bumper.jl's dynamic task-local buffers.
+  - This can be slow and allocation heavy, however, if there are many short-lived tasks that each allocate, since they will each need to be provisioned their own buffer.
+- Calling `with_bumper(f, buf)` (with a buffer argument) is not safe if allocations may occur across threads. Since you may not know all the `similar` calls present in the code, this is a-priori dangerous to use.
+- Calling `with_locked_bumper(f, buf)` provides a safe alternative simply by using a `lock` to control access to `buf`. In this way, the single buffer `buf` will be used to allocate for all `similar` calls (even across threads/tasks).
