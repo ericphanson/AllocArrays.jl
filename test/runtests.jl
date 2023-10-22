@@ -24,8 +24,7 @@ end
 
 @testset "AllocArrays.jl" begin
     @testset "Aqua" begin
-        # We currently do some piracy...
-        Aqua.test_all(AllocArrays; piracy=false)
+        Aqua.test_all(AllocArrays)
     end
 
     a = AllocArray(ones(Float64, 1000))

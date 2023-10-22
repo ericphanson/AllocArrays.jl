@@ -4,9 +4,6 @@ using ScopedValues: ScopedValue, with
 using Bumper
 using Adapt
 
-# for some piracy
-using StrideArraysCore: StrideArraysCore
-
 export AllocArray, with_bumper, with_locked_bumper
 
 include("alloc_interface.jl")
