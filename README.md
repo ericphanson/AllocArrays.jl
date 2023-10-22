@@ -46,3 +46,16 @@ a = AllocArray(arr);
 @time bumper_reduction(a) #  0.000528 seconds (25 allocations: 800 bytes)
 ```
 We can see we brought allocations down from 2.289 MiB to 800 bytes.
+
+For a less-toy example, in `test/flux.jl` we test inferencne over a Flux model:
+```julia
+# Baseline: Array
+infer!(predictions, model, data): 2.053936 seconds (59.49 k allocations: 2.841 GiB, 11.71% gc time)
+# Baseline: StrideArray
+stride_data = StrideArray.(data)
+infer!(predictions, model, stride_data): 1.960467 seconds (59.49 k allocations: 2.841 GiB, 11.92% gc time)
+# Using AllocArray:
+alloc_data = AllocArray.(data)
+infer!(predictions, model, alloc_data): 1.630521 seconds (118.34 k allocations: 28.843 MiB)
+```
+We can see in this example, we got ~100x less allocation, and slight runtime improvement.

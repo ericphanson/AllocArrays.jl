@@ -80,6 +80,7 @@ end
 (m::DigitsModel)(x) = m.chain(x)
 
 function infer!(predictions, model, data)
+    # Is this safe? NNlib multithreads some of the layers, so not sure.
     buf = Bumper.default_buffer()
     with_bumper(buf) do
         for (idx, x) in enumerate(data)
