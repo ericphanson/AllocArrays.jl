@@ -12,7 +12,8 @@ makedocs(;
                                 prettyurls=get(ENV, "CI", "false") == "true",
                                 edit_link="main",
                                 assets=String[]),
-         pages=["Home" => "index.md"])
+         pages=["Home" => "index.md",
+                "Allocator interface" => "interface.md"])
 
 deploydocs(; repo=Remotes.GitHub("ericphanson", "AllocArrays.jl"),
            push_preview=true,

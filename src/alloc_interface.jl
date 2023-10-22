@@ -5,11 +5,8 @@
 
 Alloactors need to subtype `Alloactor` and implement two methods of `alloc_similar`:
 
-1. `AllocArrays.alloc_similar(::Allocator, arr, ::Type{T}, dims::Dims)`
-
-and
-
-2. `AllocArrays.alloc_similar(::Allocator, ::Type{Arr}, dims::Dims) where {Arr<:AbstractArray}`
+- `AllocArrays.alloc_similar(::Allocator, arr, ::Type{T}, dims::Dims)`
+- `AllocArrays.alloc_similar(::Allocator, ::Type{Arr}, dims::Dims) where {Arr<:AbstractArray}`
 
 where the latter is used by broadcasting.
 """

@@ -6,9 +6,10 @@ CurrentModule = AllocArrays
 
 Documentation for [AllocArrays](https://github.com/ericphanson/AllocArrays.jl).
 
-```@index
-```
+## Public API
 
-```@autodocs
-Modules = [AllocArrays]
+```@docs
+AllocArray
+with_bumper
+with_locked_bumper
 ```
