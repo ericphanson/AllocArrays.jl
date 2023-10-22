@@ -50,6 +50,7 @@ a = AllocArray(arr);
 We can see we brought allocations down from 2.289 MiB to 800 bytes.
 
 For a less-toy example, in `test/flux.jl` we test inference over a Flux model:
+
 ```julia
 # Baseline: Array
 infer!(predictions, model, data): 1.824578 seconds (59.50 k allocations: 2.841 GiB, 10.10% gc time)
