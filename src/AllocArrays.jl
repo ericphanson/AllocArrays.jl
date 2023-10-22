@@ -1,6 +1,6 @@
 module AllocArrays
 
-using ScopedValues: ScopedValue, scoped
+using ScopedValues: ScopedValue, with
 using Bumper
 using Adapt
 

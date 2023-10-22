@@ -49,5 +49,5 @@ function alloc_similar(B::BumperAllocator, ::Type{Arr}, dims::Dims) where {Arr}
 end
 
 function with_bumper(f, buf...)
-    return scoped(f, CURRENT_ALLOCATOR => BumperAllocator(buf...))
+    return with(f, CURRENT_ALLOCATOR => BumperAllocator(buf...))
 end

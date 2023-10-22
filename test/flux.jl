@@ -1,13 +1,5 @@
 using Flux, Random, StrideArraysCore
 
-model = Chain(Dense(1 => 23, tanh), Dense(23 => 1; bias=false), only)
-
-data = [[x] for x in -2:0.001f0:2];
-@showtime sum(model, data)
-
-alloc_data = AllocArray.(data);
-@showtime sum(model, alloc_data)
-
 function bumper_run(model, data)
     buf = Bumper.default_buffer()
     with_bumper(buf) do
@@ -17,8 +9,21 @@ function bumper_run(model, data)
     end
 end
 
-@showtime bumper_run(model, alloc_data)
-@showtime bumper_run(model, alloc_data)
+@testset "Basic model" begin
+    model = Chain(Dense(1 => 23, tanh), Dense(23 => 1; bias=true), only)
+
+    data = [[x] for x in -2:0.001f0:2]
+
+    alloc_data = AllocArray.(data)
+
+    @test sum(model, data) ≈ bumper_run(model, alloc_data) atol = 1e-3
+    @test sum(model, data) ≈ sum(model, alloc_data) atol = 1e-3
+
+    # Show some timing info
+    @showtime sum(model, data)
+    @showtime sum(model, alloc_data)
+    @showtime bumper_run(model, alloc_data)
+end
 
 #####
 ##### More complicated model
@@ -74,21 +79,6 @@ end
 # Our model acts on input just by applying the chain.
 (m::DigitsModel)(x) = m.chain(x)
 
-model = DigitsModel()
-
-# Setup some fake data
-
-N_train = 10_000
-data_arr = rand(Float32, 28, 28, N_train)
-
-# Partition into batches of size 32
-batch_size = 32
-data = [reshape(data_arr[:, :, I], 28, 28, 1, :)
-        for I in Iterators.partition(1:N_train, batch_size)]
-
-model(data[1])
-model(AllocArray(data[1]))
-
 function infer!(predictions, model, data)
     buf = Bumper.default_buffer()
     with_bumper(buf) do
@@ -101,17 +91,38 @@ function infer!(predictions, model, data)
     return predictions
 end
 
-n_class = 10
-predictions = [Matrix{Float32}(undef, n_class, size(x, 4)) for x in data];
+@testset "More complicated model" begin
+    model = DigitsModel()
 
-alloc_data = AllocArray.(data)
+    # Setup some fake data
+    N = 1_000
+    data_arr = rand(Float32, 28, 28, N)
 
-@showtime infer!(predictions, model, data);
-@showtime infer!(predictions, model, data);
+    # Partition into batches of size 32
+    batch_size = 32
+    data = [reshape(data_arr[:, :, I], 28, 28, 1, :)
+            for I in Iterators.partition(1:N, batch_size)]
 
-@showtime infer!(predictions, model, alloc_data);
-@showtime infer!(predictions, model, alloc_data);
+    n_class = 10
+    fresh_predictions() = [Matrix{Float32}(undef, n_class, size(x, 4)) for x in data]
 
-stride_data = StrideArray.(data)
-@showtime infer!(predictions, model, stride_data);
-@showtime infer!(predictions, model, stride_data);
+    alloc_data = AllocArray.(data)
+
+    preds_data = fresh_predictions()
+    infer!(preds_data, model, data)
+
+    preds_alloc = fresh_predictions()
+    infer!(preds_alloc, model, alloc_data)
+
+    preds_stride = fresh_predictions()
+    stride_data = StrideArray.(data)
+    infer!(preds_stride, model, stride_data)
+
+    @test preds_data ≈ preds_alloc
+    @test preds_data ≈ preds_stride
+
+    predictions = fresh_predictions()
+    @showtime infer!(predictions, model, data)
+    @showtime infer!(predictions, model, alloc_data)
+    @showtime infer!(predictions, model, stride_data)
+end
