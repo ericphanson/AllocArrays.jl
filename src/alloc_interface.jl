@@ -59,7 +59,7 @@ end
     with_bumper(f)
 
 Runs `f()` in the context of using a `BumperAllocator{Nothing}` to
-allocate memory to `similar` calls on [`AllocArrays`](@ref).
+allocate memory to `similar` calls on [`AllocArray`](@ref)s.
 
 All such allocations should occur within an `@no_escape` block,
 and of course, no such allocations should escape that block.
@@ -83,7 +83,7 @@ with_bumper(f)
     with_bumper(f, buf::AllocBuffer)
 
 Runs `f()` in the context of using a `BumperAllocator{typeof(buf)}` to
-allocate memory to `similar` calls on [`AllocArrays`](@ref).
+allocate memory to `similar` calls on [`AllocArray`](@ref)s.
 
 All such allocations should occur within an `@no_escape` block,
 and of course, no such allocations should escape that block.
@@ -136,7 +136,7 @@ end
     with_locked_bumper(f, buf::AllocBuffer)
 
 Runs `f()` in the context of using a `LockedBumperAllocator` to
-allocate memory to `similar` calls on [`AllocArrays`](@ref).
+allocate memory to `similar` calls on [`AllocArray`](@ref)s.
 
 All such allocations should occur within an `@no_escape` block,
 and of course, no such allocations should escape that block.
