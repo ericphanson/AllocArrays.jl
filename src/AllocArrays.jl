@@ -2,6 +2,10 @@ module AllocArrays
 
 using ScopedValues: ScopedValue, scoped
 using Bumper
+using Adapt
+
+# for some piracy
+using StrideArraysCore: StrideArraysCore
 
 export AllocArray, with_bumper
 

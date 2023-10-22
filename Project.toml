@@ -4,14 +4,17 @@ authors = ["Eric P. Hanson"]
 version = "1.0.0-DEV"
 
 [deps]
+Adapt = "79e6a3ab-5dfb-504d-930d-738a2a938a0e"
 Bumper = "8ce10254-0962-460f-a3d8-1f77fea1446e"
 ScopedValues = "7e506255-f358-4e82-b7e4-beb19740aa63"
+StrideArraysCore = "7792a7ef-975c-4747-a70f-980b88e8d1da"
 
 [compat]
 julia = "1.9"
 
 [extras]
+Flux = "587475ba-b771-5e3f-ad9e-33799f191a9c"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["Test"]
+test = ["Flux", "Test"]
