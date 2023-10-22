@@ -70,3 +70,11 @@ Base.elsize(::Type{<:AllocArray{T,N,Arr}}) where {T,N,Arr} = Base.elsize(Arr)
 @inline Base.elsize(::Type{<:StrideArraysCore.AbstractStrideArray{T}}) where {T} = sizeof(T)
 
 Base.strides(a::AllocArray) = strides(parent(a))
+
+#####
+##### Other
+#####
+
+# Avoid reshaped arrays; saves quite a bit of time
+Base.reshape(a::AllocArray, args::Int...) = AllocArray(reshape(parent(a), args...))
+Base.reshape(a::AllocArray, dims::Dims) = AllocArray(reshape(parent(a), dims))
