@@ -10,7 +10,6 @@ Documentation for [AllocArrays](https://github.com/ericphanson/AllocArrays.jl).
 
 ```@docs
 AllocArray
-with_bumper
 with_locked_bumper
 AllocArrays.unsafe_with_bumper
 ```

@@ -15,8 +15,9 @@ function basic_reduction(a)
 end
 
 function bumper_reduction(a)
-    with_bumper() do
-        @no_escape begin
+    buf = AllocBuffer()
+    with_locked_bumper(buf) do
+        @no_escape buf begin
             basic_reduction(a)
         end
     end

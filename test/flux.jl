@@ -2,7 +2,7 @@ using Flux, Random, StrideArraysCore
 using AllocArrays: unsafe_with_bumper
 
 function bumper_run(model, data)
-    buf = Bumper.default_buffer()
+    buf = AllocBuffer()
     # should be safe here because we don't allocate concurrently
     unsafe_with_bumper(buf) do
         @no_escape buf begin
@@ -82,12 +82,12 @@ end
 (m::DigitsModel)(x) = m.chain(x)
 
 function infer!(predictions, model, data)
-    buf = default_buffer()
+    buf = AllocBuffer()
     # Here we use a locked bumper for thread-safety, since NNlib multithreads
     # some of it's functions. However we are sure to only deallocate outside of the threaded region. (All concurrency occurs within the `model` call itself).
     with_locked_bumper(buf) do
         for (idx, x) in enumerate(data)
-            @no_escape buf begin
+            @no_escape buf begin # reset `buf` after each batch
                 predictions[idx] .= model(x)
             end
         end

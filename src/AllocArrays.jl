@@ -4,7 +4,7 @@ using ScopedValues: ScopedValue, with
 using Bumper
 using Adapt
 
-export AllocArray, with_bumper, with_locked_bumper
+export AllocArray, with_locked_bumper
 
 include("alloc_interface.jl")
 include("AllocArray.jl")

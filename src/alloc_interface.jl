@@ -37,55 +37,17 @@ end
 
 # Could be moved to a package extension?
 
-struct BumperAllocator{B<:Union{Nothing,AllocBuffer}} <: Allocator
+struct BumperAllocator{B<:AllocBuffer} <: Allocator
     buf::B
 end
 
-BumperAllocator() = BumperAllocator(nothing)
-
 function alloc_similar(B::BumperAllocator, arr, ::Type{T}, dims::Dims) where {T}
     # ignore arr type for now
-    return Bumper.alloc(T, @something(B.buf, default_buffer()), dims...)
+    return Bumper.alloc(T, B.buf, dims...)
 end
 
 function alloc_similar(B::BumperAllocator, ::Type{Arr}, dims::Dims) where {Arr}
-    return Bumper.alloc(eltype(Arr), @something(B.buf, default_buffer()), dims...)
-end
-
-"""
-    with_bumper(f)
-
-Runs `f()` in the context of using a `BumperAllocator{Nothing}` to
-allocate memory to `similar` calls on [`AllocArray`](@ref)s.
-
-All such allocations should occur within an `@no_escape` block,
-and of course, no such allocations should escape that block.
-
-Thread-safe: `f` may spawn multiple tasks or threads, which may each allocate memory using `similar` calls on `AllocArray`'s.
-
-## Example
-
-```jldoctest
-using AllocArrays, Bumper
-input = AllocArray([1,2,3])
-c = Channel(Inf)
-with_bumper() do
-    Threads.@threads for i = 1:10
-        @no_escape begin
-            # ...code with may be multithreaded but which must not escape or return newly-allocated AllocArrays...
-            put!(c, sum(input .+ i))
-        end
-     end
-     close(c)
-end
-sum(collect(c))
-
-# output
-225
-```
-"""
-function with_bumper(f)
-    return with(f, CURRENT_ALLOCATOR => BumperAllocator())
+    return Bumper.alloc(eltype(Arr), B.buf, dims...)
 end
 
 """
@@ -101,6 +63,9 @@ and of course, no such allocations should escape that block.
     Not thread-safe. `f` must not allocate memory using `similar` calls on `AllocArray`'s
     across multiple threads or tasks.
 
+Remember: if `f` calls into another package, you might not know if they use concurrency
+or not! It is safer to use [`with_locked_bumper`](@ref) for this reason.
+
 ## Example
 
 ```jldoctest
@@ -108,7 +73,7 @@ using AllocArrays, Bumper
 using AllocArrays: unsafe_with_bumper
 
 input = AllocArray([1,2,3])
-buf = default_buffer()
+buf = AllocBuffer()
 unsafe_with_bumper(buf) do
      @no_escape buf begin
         # ...code with must not allocate AllocArrays on multiple tasks via `similar` nor escape or return newly-allocated AllocArrays...
@@ -165,7 +130,7 @@ Thread-safe: `f` may spawn multiple tasks or threads, which may each allocate me
 ```jldoctest
 using AllocArrays, Bumper
 
-buf = default_buffer()
+buf = AllocBuffer()
 input = AllocArray([1,2,3])
 c = Channel(Inf)
 with_locked_bumper(buf) do
