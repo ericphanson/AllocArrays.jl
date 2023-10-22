@@ -1,8 +1,10 @@
 using Flux, Random, StrideArraysCore
+using AllocArrays: unsafe_with_bumper
 
 function bumper_run(model, data)
     buf = Bumper.default_buffer()
-    with_bumper(buf) do
+    # should be safe here because we don't allocate concurrently
+    unsafe_with_bumper(buf) do
         @no_escape buf begin
             sum(model, data)
         end

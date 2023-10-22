@@ -65,19 +65,31 @@ Thread-safe: `f` may spawn multiple tasks or threads, which may each allocate me
 
 ## Example
 
-```julia
+```jldoctest
 using AllocArrays, Bumper
+input = AllocArray([1,2,3])
+c = Channel(Inf)
 with_bumper() do
-     @no_escape begin
-        ...code with may be multithreaded but which must not escape or return newly-allocated AllocArrays...
+    Threads.@threads for i = 1:10
+        @no_escape begin
+            # ...code with may be multithreaded but which must not escape or return newly-allocated AllocArrays...
+            put!(c, sum(input .+ i))
+        end
      end
+     close(c)
 end
+sum(collect(c))
+
+# output
+225
 ```
 """
-with_bumper(f)
+function with_bumper(f)
+    return with(f, CURRENT_ALLOCATOR => BumperAllocator())
+end
 
 """
-    with_bumper(f, buf::AllocBuffer)
+    unsafe_with_bumper(f, buf::AllocBuffer)
 
 Runs `f()` in the context of using a `BumperAllocator{typeof(buf)}` to
 allocate memory to `similar` calls on [`AllocArray`](@ref)s.
@@ -91,20 +103,25 @@ and of course, no such allocations should escape that block.
 
 ## Example
 
-```julia
+```jldoctest
 using AllocArrays, Bumper
+using AllocArrays: unsafe_with_bumper
+
+input = AllocArray([1,2,3])
 buf = default_buffer()
-with_bumper(buf) do
+unsafe_with_bumper(buf) do
      @no_escape buf begin
-        ...code with must not allocate AllocArrays on multiple tasks via `similar` nor escape or return newly-allocated AllocArrays...
+        # ...code with must not allocate AllocArrays on multiple tasks via `similar` nor escape or return newly-allocated AllocArrays...
+        sum(input .* 2)
      end
 end
+
+# output
+12
 ```
 """
-with_bumper(f, buf)
-
-function with_bumper(f, buf...)
-    return with(f, CURRENT_ALLOCATOR => BumperAllocator(buf...))
+function unsafe_with_bumper(f, buf::AllocBuffer)
+    return with(f, CURRENT_ALLOCATOR => BumperAllocator(buf))
 end
 
 #####
@@ -142,16 +159,25 @@ Thread-safe: `f` may spawn multiple tasks or threads, which may each allocate me
 
 ## Example
 
-```julia
+```jldoctest
 using AllocArrays, Bumper
 
 buf = default_buffer()
-
+input = AllocArray([1,2,3])
+c = Channel(Inf)
 with_locked_bumper(buf) do
-     @no_escape buf begin
-        ...code with may be multithreaded but which must not escape or return newly-allocated AllocArrays...
-     end
+    # ...code with may be multithreaded but which must not escape or return newly-allocated AllocArrays...
+    @sync for i = 1:10
+        @no_escape buf begin
+            Threads.@spawn put!(c, sum(input .+ i))
+        end
+    end
+    close(c)
 end
+sum(collect(c))
+
+# output
+225
 ```
 """
 function with_locked_bumper(f, buf::AllocBuffer)
