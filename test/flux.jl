@@ -95,11 +95,19 @@ function infer!(predictions, model, data)
     return predictions
 end
 
+function infer2!(predictions, model, data)
+    # model = fmap(AllocArray, model; exclude = x -> x isa AbstractArray)
+    for (idx, x) in enumerate(data)
+        predictions[idx] .= model(x)
+    end
+    return predictions
+end
+
 @testset "More complicated model" begin
     model = DigitsModel()
 
     # Setup some fake data
-    N = 1_000
+    N = 10_000
     data_arr = rand(Float32, 28, 28, N)
 
     # Partition into batches of size 32
@@ -129,4 +137,13 @@ end
     @showtime infer!(predictions, model, data)
     @showtime infer!(predictions, model, stride_data)
     @showtime infer!(predictions, model, alloc_data)
+
+    infer2!(predictions, model, data)
+    infer2!(predictions, model, stride_data)
+    infer2!(predictions, model, alloc_data)
+
+    @showtime infer2!(predictions, model, data)
+    @showtime infer2!(predictions, model, stride_data)
+    @showtime infer2!(predictions, model, alloc_data)
+
 end
