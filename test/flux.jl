@@ -123,6 +123,6 @@ end
 
     predictions = fresh_predictions()
     @showtime infer!(predictions, model, data)
-    @showtime infer!(predictions, model, alloc_data)
     @showtime infer!(predictions, model, stride_data)
+    @showtime infer!(predictions, model, alloc_data)
 end
