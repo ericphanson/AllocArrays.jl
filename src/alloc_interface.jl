@@ -158,7 +158,7 @@ and of course, no such allocations should escape that block.
 Thread-safe: `f` may spawn multiple tasks or threads, which may each allocate memory using `similar` calls on `AllocArray`'s. However:
 
 !!! warning
-    `f` must call `@no_escape` only outside of the threaded region, because de-allocating memory (via `@no_escape`) is not concurrency-safe with this approach.
+    `f` must call `@no_escape` only outside of the threaded region, because de-allocating memory in the buffer (via `@no_escape`) is not concurrency-safe with this approach.
 
 ## Example
 
