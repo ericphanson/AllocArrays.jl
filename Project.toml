@@ -10,6 +10,10 @@ ScopedValues = "7e506255-f358-4e82-b7e4-beb19740aa63"
 StrideArraysCore = "7792a7ef-975c-4747-a70f-980b88e8d1da"
 
 [compat]
+Adapt = "3"
+Bumper = "0.3"
+ScopedValues = "1"
+StrideArraysCore = "0.5"
 julia = "1.9"
 
 [extras]
