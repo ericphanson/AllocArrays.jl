@@ -1,11 +1,18 @@
 # Allocation interface
-# Alloactors need to subtype `Alloactor`
-# and implement two methods of `alloc_similar`:
-# `alloc_similar(::Allocator, arr, ::Type{T}, dims::Dims)`
-# and
-# `alloc_similar(::Allocator, ::Type{Arr}, dims::Dims) where {Arr<:AbstractArray}`
-# where the latter is used by broadcasting.
 
+"""
+    abstract type Allocator end
+
+Alloactors need to subtype `Alloactor` and implement two methods of `alloc_similar`:
+
+1. `AllocArrays.alloc_similar(::Allocator, arr, ::Type{T}, dims::Dims)`
+
+and
+
+2. `AllocArrays.alloc_similar(::Allocator, ::Type{Arr}, dims::Dims) where {Arr<:AbstractArray}`
+
+where the latter is used by broadcasting.
+"""
 abstract type Allocator end
 
 #####
@@ -48,6 +55,57 @@ function alloc_similar(B::BumperAllocator, ::Type{Arr}, dims::Dims) where {Arr}
     return Bumper.alloc(eltype(Arr), @something(B.buf, default_buffer()), dims...)
 end
 
+"""
+    with_bumper(f)
+
+Runs `f()` in the context of using a `BumperAllocator{Nothing}` to
+allocate memory to `similar` calls on [`AllocArrays`](@ref).
+
+All such allocations should occur within an `@no_escape` block,
+and of course, no such allocations should escape that block.
+
+Thread-safe: `f` may spawn multiple tasks or threads, which may each allocate memory using `similar` calls on `AllocArray`'s.
+
+## Example
+
+```julia
+using AllocArrays, Bumper
+with_bumper() do
+     @no_escape begin
+        ...code with may be multithreaded but which must not escape or return newly-allocated AllocArrays...
+     end
+end
+```
+"""
+with_bumper(f)
+
+"""
+    with_bumper(f, buf::AllocBuffer)
+
+Runs `f()` in the context of using a `BumperAllocator{typeof(buf)}` to
+allocate memory to `similar` calls on [`AllocArrays`](@ref).
+
+All such allocations should occur within an `@no_escape` block,
+and of course, no such allocations should escape that block.
+
+!!! warning
+    Not thread-safe. `f` must not allocate memory using `similar` calls on `AllocArray`'s
+    across multiple threads or tasks.
+
+## Example
+
+```julia
+using AllocArrays, Bumper
+buf = default_buffer()
+with_bumper(buf) do
+     @no_escape buf begin
+        ...code with must not allocate AllocArrays on multiple tasks via `similar` nor escape or return newly-allocated AllocArrays...
+     end
+end
+```
+"""
+with_bumper(f, buf)
+
 function with_bumper(f, buf...)
     return with(f, CURRENT_ALLOCATOR => BumperAllocator(buf...))
 end
@@ -63,7 +121,7 @@ struct LockedBumperAllocator{B<:AllocBuffer} <: Allocator
     bumper::BumperAllocator{B}
     lock::ReentrantLock
 end
-function LockedBumperAllocator(buf=default_buffer())
+function LockedBumperAllocator(buf::AllocBuffer)
     return LockedBumperAllocator(BumperAllocator(buf), ReentrantLock())
 end
 Base.lock(f::Function, B::LockedBumperAllocator) = lock(f, B.lock)
@@ -73,6 +131,32 @@ Base.unlock(B::LockedBumperAllocator) = unlock(B.lock)
 function alloc_similar(B::LockedBumperAllocator, args...)
     return @lock(B, alloc_similar(B.bumper, args...))
 end
-function with_locked_bumper(f, buf...)
-    return with(f, CURRENT_ALLOCATOR => LockedBumperAllocator(buf...))
+
+"""
+    with_locked_bumper(f, buf::AllocBuffer)
+
+Runs `f()` in the context of using a `LockedBumperAllocator` to
+allocate memory to `similar` calls on [`AllocArrays`](@ref).
+
+All such allocations should occur within an `@no_escape` block,
+and of course, no such allocations should escape that block.
+
+Thread-safe: `f` may spawn multiple tasks or threads, which may each allocate memory using `similar` calls on `AllocArray`'s.
+
+## Example
+
+```julia
+using AllocArrays, Bumper
+
+buf = default_buffer()
+
+with_locked_bumper(buf) do
+     @no_escape buf begin
+        ...code with may be multithreaded but which must not escape or return newly-allocated AllocArrays...
+     end
+end
+```
+"""
+function with_locked_bumper(f, buf::AllocBuffer)
+    return with(f, CURRENT_ALLOCATOR => LockedBumperAllocator(buf))
 end
