@@ -14,13 +14,16 @@ struct AllocArray{T,N,A<:AbstractArray{T,N}} <: AbstractArray{T,N}
     arr::A
 end
 
-Base.parent(a::AllocArray) = a.arr
+@inline Base.parent(a::AllocArray) = getfield(a, :arr)
 
-function Base.setindex!(a::AllocArray{T,N}, value, I::Vararg{Int,N}) where {T,N}
-    return setindex!(parent(a), value, I...)
+@inline Base.@propagate_inbounds function Base.setindex!(a::AllocArray{T,N}, value, I::Vararg{Int,N}) where {T,N}
+    return setindex!(getfield(a, :arr), value, I...)
 end
-Base.getindex(a::AllocArray{T,N}, I::Vararg{Int,N}) where {T,N} = getindex(parent(a), I...)
-Base.size(a::AllocArray) = size(parent(a))
+
+@inline Base.@propagate_inbounds function Base.getindex(a::AllocArray{T,N}, I::Vararg{Int,N}) where {T,N}
+    return getindex(getfield(a, :arr), I...)
+end
+Base.size(a::AllocArray) = size(getfield(a, :arr))
 
 # used only by broadcasting?
 function Base.similar(::Type{AllocArray{T,N,Arr}}, dims::Dims) where {T,N,Arr}
@@ -32,8 +35,8 @@ function Base.similar(::Type{AllocArray{T,N,Arr}}, dims::Dims) where {T,N,Arr}
     return AllocArray(inner)
 end
 
-function Base.similar(A::AllocArray, ::Type{T}, dims::Dims) where {T}
-    inner = alloc_similar(CURRENT_ALLOCATOR[], parent(A), T, dims)
+function Base.similar(a::AllocArray, ::Type{T}, dims::Dims) where {T}
+    inner = alloc_similar(CURRENT_ALLOCATOR[], getfield(a, :arr), T, dims)
     return AllocArray(inner)
 end
 
@@ -61,7 +64,7 @@ Adapt.adapt_structure(to, x::AllocArray) = AllocArray(adapt(to, parent(x)))
 #####
 
 function Base.unsafe_convert(::Type{Ptr{T}}, a::AllocArray) where {T}
-    return Base.unsafe_convert(Ptr{T}, parent(a))
+    return Base.unsafe_convert(Ptr{T}, getfield(a, :arr))
 end
 
 Base.elsize(::Type{<:AllocArray{T,N,Arr}}) where {T,N,Arr} = Base.elsize(Arr)
@@ -69,12 +72,18 @@ Base.elsize(::Type{<:AllocArray{T,N,Arr}}) where {T,N,Arr} = Base.elsize(Arr)
 # Piracy - shouldn't this be defined on the type level in StrideArraysCore?
 @inline Base.elsize(::Type{<:StrideArraysCore.AbstractStrideArray{T}}) where {T} = sizeof(T)
 
-Base.strides(a::AllocArray) = strides(parent(a))
+Base.strides(a::AllocArray) = strides(getfield(a, :arr))
 
 #####
 ##### Other
 #####
 
 # Avoid reshaped arrays; saves quite a bit of time
-Base.reshape(a::AllocArray, args::Int...) = AllocArray(reshape(parent(a), args...))
-Base.reshape(a::AllocArray, dims::Dims) = AllocArray(reshape(parent(a), dims))
+Base.reshape(a::AllocArray, args::Int...) = AllocArray(reshape(getfield(a, :arr), args...))
+Base.reshape(a::AllocArray, dims::Dims) = AllocArray(reshape(getfield(a, :arr), dims))
+
+# Also helps avoid reshaped arrays
+function Base.view(a::AllocArray{T,N},
+                   i::Vararg{Union{Integer,AbstractRange,Colon},N}) where {T,N}
+    return AllocArray(view(getfield(a, :arr), i...))
+end

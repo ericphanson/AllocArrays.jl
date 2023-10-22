@@ -3,10 +3,10 @@ using Flux, Random
 model = Chain(Dense(1 => 23, tanh), Dense(23 => 1; bias=false), only)
 
 data = [[x] for x in -2:0.001f0:2];
-@time sum(model, data)
+@showtime sum(model, data)
 
 alloc_data = AllocArray.(data);
-@time sum(model, alloc_data)
+@showtime sum(model, alloc_data)
 
 function bumper_run(model, data)
     buf = Bumper.default_buffer()
@@ -17,8 +17,8 @@ function bumper_run(model, data)
     end
 end
 
-@time bumper_run(model, alloc_data)
-@time bumper_run(model, alloc_data)
+@showtime bumper_run(model, alloc_data)
+@showtime bumper_run(model, alloc_data)
 
 #####
 ##### More complicated model
@@ -105,8 +105,14 @@ n_class = 10
 predictions = [Matrix{Float32}(undef, n_class, size(x, 4)) for x in data];
 
 alloc_data = AllocArray.(data)
-@time infer!(predictions, model, data);
-@time infer!(predictions, model, data);
 
-@time infer!(predictions, model, alloc_data);
-@time infer!(predictions, model, alloc_data);
+@showtime infer!(predictions, model, data);
+@showtime infer!(predictions, model, data);
+
+@showtime infer!(predictions, model, alloc_data);
+@showtime infer!(predictions, model, alloc_data);
+
+
+stride_data = StrideArray.(data)
+@showtime infer!(predictions, model, stride_data);
+@showtime infer!(predictions, model, stride_data);
