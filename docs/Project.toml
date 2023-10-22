@@ -1,5 +1,6 @@
 [deps]
 AllocArrays = "5c00bae2-1499-4716-9206-27f63fd08a44"
+Bumper = "8ce10254-0962-460f-a3d8-1f77fea1446e"
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
 
 [compat]

@@ -4,7 +4,6 @@
 [![Coverage](https://codecov.io/gh/ericphanson/AllocArrays.jl/branch/main/graph/badge.svg)](https://codecov.io/gh/ericphanson/AllocArrays.jl)
 [![](https://img.shields.io/badge/docs-dev-blue.svg)](https://ericphanson.github.io/AllocArrays.jl/dev/)
 
-
 Prototype that attempts to allow usage of [Bumper.jl](https://github.com/MasonProtter/Bumper.jl) (or potentially other allocation strategies) through code that doesn't know about Bumper.
 
 This is accomplished by creating a wrapper type `AllocArray` which dispatches `similar` dynamically to an allocator depending on the contextual scope (using [ScopedValues.jl](https://github.com/vchuravy/ScopedValues.jl)).
@@ -68,13 +67,13 @@ We can see in this example, we got ~100x less allocation, and similar runtime.
 
 ### Safety
 
-Before using a bump allocator (`with_bumper` or `with_locked_bumper`) it is recommended the user read the [Bumper.jl README](https://github.com/MasonProtter/Bumper.jl#bumperjl) to understand how it works and what the limitations are.
+Before using a bump allocator (`with_bumper`, `unsafe_with_bumper`, or `with_locked_bumper`) it is recommended the user read the [Bumper.jl README](https://github.com/MasonProtter/Bumper.jl#bumperjl) to understand how it works and what the limitations are.
 
 Note also:
 
 - Just as with all usage of Bumper.jl, the user is responsible for only using Bumper's `@no_escape` when newly allocated arrays truly will not escape
-  - with AllocArrays this can be slightly more subtle, because within `with_bumper` or `with_locked_bumper` block, `similar` calls on `AllocArray`s will allocate using the bump allocator. Thus, one must be sure that none of those allocations leak past a `@no_escape` block. The simplest way to do so is to be sure no allocations of any kind leak past a `@no_escape` block.
-- Calling `with_bumper(f)` (without a buffer argument) is concurrency-safe by virtue of using Bumper.jl's dynamic task-local buffers.
+  - with AllocArrays this can be slightly more subtle, because within `with_bumper`, `unsafe_with_bumper`, or `with_locked_bumper` block, `similar` calls on `AllocArray`s will allocate using the bump allocator. Thus, one must be sure that none of those allocations leak past a `@no_escape` block. The simplest way to do so is to be sure no allocations of any kind leak past a `@no_escape` block.
+- Calling `with_bumper(f)` is concurrency-safe by virtue of using Bumper.jl's dynamic task-local buffers.
   - This can be slow and allocation heavy, however, if there are many short-lived tasks that each allocate, since they will each need to be provisioned their own buffer.
-- Calling `with_bumper(f, buf)` (with a buffer argument) is not safe if allocations may occur across threads. Since you may not know all the `similar` calls present in the code, this is a-priori dangerous to use.
-- Calling `with_locked_bumper(f, buf)` provides a safe alternative simply by using a `lock` to control access to `buf`. In this way, the single buffer `buf` will be used to allocate for all `similar` calls (even across threads/tasks).
+- Calling `unsafe_with_bumper(f, buf)` is not safe if allocations may occur concurrently. Since you may not know all the `similar` calls present in the code, this is a-priori dangerous to use.
+- Calling `with_locked_bumper(f, buf)` provides a safe alternative simply by using a lock to control access to `buf`. In this way, the single buffer `buf` will be used to allocate for all `similar` calls (even across threads/tasks).
