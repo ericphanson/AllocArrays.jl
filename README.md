@@ -2,3 +2,45 @@
 
 [![Build Status](https://github.com/ericphanson/AllocArrays.jl/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/ericphanson/AllocArrays.jl/actions/workflows/CI.yml?query=branch%3Amain)
 [![Coverage](https://codecov.io/gh/ericphanson/AllocArrays.jl/branch/main/graph/badge.svg)](https://codecov.io/gh/ericphanson/AllocArrays.jl)
+
+Prototype that attempts to allow usage of [Bumper.jl](https://github.com/MasonProtter/Bumper.jl) (or potentially other allocation strategies) through code that doesn't know about Bumper.
+
+This is accomplished by creating a wrapper type `AllocArray` which dispatches `similar` dynamically to an allocator depending on the contextual scope (using [ScopedValues.jl](https://github.com/vchuravy/ScopedValues.jl)).
+
+Demo:
+```julia
+# Some function, possibly in some package,
+# that doesn't know about bumper, but happens to only use `similar`
+# to allocate memory
+function some_allocating_function(a)
+    b = similar(a)
+    b .= a
+    c = similar(a)
+    c .= a
+    return (; b, c)
+end
+
+function basic_reduction(a)
+    (; b, c) = some_allocating_function(a)
+    return sum(b .+ c)
+end
+
+arr = ones(Float64, 100_000)
+@time basic_reduction(a) #  0.129436 seconds (181.10 k allocations: 14.228 MiB, 99.11% compilation time)
+@time basic_reduction(a) #  0.000494 seconds (21 allocations: 2.289 MiB)
+
+
+function bumper_reduction(a)
+    with_bumper() do
+        @no_escape begin
+            basic_reduction(a)
+        end
+    end
+end
+
+a = AllocArray(arr);
+
+@time bumper_reduction(a) #  0.010638 seconds (16.28 k allocations: 1.129 MiB, 89.93% compilation time)
+@time bumper_reduction(a) #  0.000528 seconds (25 allocations: 800 bytes)
+```
+We can see we brought allocations down from 2.289 MiB to 800 bytes.

@@ -3,6 +3,10 @@ uuid = "5c00bae2-1499-4716-9206-27f63fd08a44"
 authors = ["Eric P. Hanson"]
 version = "1.0.0-DEV"
 
+[deps]
+Bumper = "8ce10254-0962-460f-a3d8-1f77fea1446e"
+ScopedValues = "7e506255-f358-4e82-b7e4-beb19740aa63"
+
 [compat]
 julia = "1.9"
 

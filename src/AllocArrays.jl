@@ -1,5 +1,11 @@
 module AllocArrays
 
-# Write your package code here.
+using ScopedValues: ScopedValue, scoped
+using Bumper
 
-end
+export AllocArray, with_bumper
+
+include("alloc_interface.jl")
+include("AllocArray.jl")
+
+end # module
