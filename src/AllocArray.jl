@@ -12,9 +12,6 @@ but dispatches `similar` to special allocation methods.
 """
 struct AllocArray{T,N,A<:AbstractArray{T,N}} <: AbstractArray{T,N}
     arr::A
-    # function AllocArray(arr)
-    # return adapt(AllocArray, arr)
-    # end
 end
 
 Base.parent(a::AllocArray) = a.arr
@@ -68,7 +65,6 @@ function Base.unsafe_convert(::Type{Ptr{T}}, a::AllocArray) where {T}
 end
 
 Base.elsize(::Type{<:AllocArray{T,N,Arr}}) where {T,N,Arr} = Base.elsize(Arr)
-# Base.elsize(a::AllocArray) = Base.elsize(parent(a))
 
 # Piracy - shouldn't this be defined on the type level in StrideArraysCore?
 @inline Base.elsize(::Type{<:StrideArraysCore.AbstractStrideArray{T}}) where {T} = sizeof(T)
