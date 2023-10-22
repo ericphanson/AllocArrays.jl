@@ -11,7 +11,14 @@ export AllocArray, with_bumper
 
 include("alloc_interface.jl")
 
-const CURRENT_ALLOCATOR = ScopedValue{Allocator}(DEFAULT_ALLOCATOR)
+# make more type stable...
+# const CURRENT_ALLOCATOR = ScopedValue{Allocator}(DEFAULT_ALLOCATOR)
+const CURRENT_ALLOCATOR = Ref{BumperAllocator{Vector{UInt8}}}()
+
+function __init__()
+    CURRENT_ALLOCATOR[] = BumperAllocator(Bumper.default_buffer())
+    return nothing
+end
 
 include("AllocArray.jl")
 

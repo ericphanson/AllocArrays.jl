@@ -2,15 +2,16 @@ using Flux, Random
 
 model = Chain(Dense(1 => 23, tanh), Dense(23 => 1; bias=false), only)
 
-data = [[x] for x in -2:0.001f0:2]
+data = [[x] for x in -2:0.001f0:2];
 @time sum(model, data)
 
-alloc_data = AllocArray.(data)
+alloc_data = AllocArray.(data);
 @time sum(model, alloc_data)
 
 function bumper_run(model, data)
-    with_bumper() do
-        @no_escape begin
+    buf = Bumper.default_buffer()
+    with_bumper(buf) do
+        @no_escape buf begin
             sum(model, data)
         end
     end
@@ -88,16 +89,15 @@ data = [reshape(data_arr[:, :, I], 28, 28, 1, :)
 model(data[1])
 model(AllocArray(data[1]))
 
-
 function infer!(predictions, model, data)
     buf = Bumper.default_buffer()
-    # with_bumper() do
-    for (idx, x) in enumerate(data)
-        @no_escape buf begin
-            predictions[idx] .= model(x)
+    with_bumper(buf) do
+        for (idx, x) in enumerate(data)
+            @no_escape buf begin
+                predictions[idx] .= model(x)
+            end
         end
     end
-    # end
     return predictions
 end
 
@@ -105,8 +105,8 @@ n_class = 10
 predictions = [Matrix{Float32}(undef, n_class, size(x, 4)) for x in data];
 
 alloc_data = AllocArray.(data)
-# @time infer!(predictions, model, data);
-# @time infer!(predictions, model, data);
+@time infer!(predictions, model, data);
+@time infer!(predictions, model, data);
 
-# @time infer!(predictions, model, alloc_data);
-# @time infer!(predictions, model, alloc_data);
+@time infer!(predictions, model, alloc_data);
+@time infer!(predictions, model, alloc_data);

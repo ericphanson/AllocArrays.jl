@@ -31,21 +31,31 @@ end
 ##### Bumper.jl
 #####
 
-# Could be moved to a package extension
+# Could be moved to a package extension?
 
-# We could add a field for the buffer instead of relying
-# on the default buffer. That might be important for working with CuArrays etc
-struct BumperAllocator <: Allocator end
+struct BumperAllocator{B} <: Allocator
+    buf::AllocBuffer{B}
+end
 
-function alloc_similar(::BumperAllocator, arr, ::Type{T}, dims::Dims) where {T}
+BumperAllocator() = BumperAllocator(Bumper.default_buffer())
+
+function alloc_similar(B::BumperAllocator, arr, ::Type{T}, dims::Dims) where {T}
     # ignore arr type for now
-    return Bumper.alloc(T, dims...)
+    return Bumper.alloc(T, B.buf, dims...)
 end
 
-function alloc_similar(::BumperAllocator, ::Type{Arr}, dims::Dims) where {Arr}
-    return Bumper.alloc(eltype(Arr), dims...)
+function alloc_similar(B::BumperAllocator, ::Type{Arr}, dims::Dims) where {Arr}
+    return Bumper.alloc(eltype(Arr), B.buf, dims...)
 end
 
-function with_bumper(f)
-    return scoped(f, CURRENT_ALLOCATOR => BumperAllocator())
+function with_bumper(f, buf)
+    old = CURRENT_ALLOCATOR[]
+    CURRENT_ALLOCATOR[] = BumperAllocator(buf)
+    try
+        return f()
+    finally
+        CURRENT_ALLOCATOR[] = old
+    end
 end
+
+with_bumper(f) = f()

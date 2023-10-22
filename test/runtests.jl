@@ -23,8 +23,7 @@ function bumper_reduction(a)
 end
 
 @testset "AllocArrays.jl" begin
-
-    a = AllocArray(ones(Float64, 1000));
+    a = AllocArray(ones(Float64, 1000))
 
     (; b, c) = some_allocating_function(a)
     @test b isa AllocArray
@@ -32,4 +31,6 @@ end
 
     @test bumper_reduction(a) == 2000.0
     @test basic_reduction(a) == 2000.0
+
+    include("flux.jl")
 end
