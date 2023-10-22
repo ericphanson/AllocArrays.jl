@@ -71,9 +71,9 @@ We can see in this example, we got ~100x less allocation, and similar runtime.
 This package does not create any Bumper.jl buffers, does not use any implicit ones, and does not reset any buffer that is handed to it. These choices are deliberate: the caller must create the buffer, pass it to AllocArrays.jl as desired, and reset it when they are done.
 
 In particular, the caller must:
-- not reset a buffer in active use. E.g., by calling `@no_escape` on a buffer that may be used by another task
-- nor allow memory allocated with a buffer to escape after the underlying buffer has been reset
-- and must reset their buffers before it runs out of memory
+- ...not reset a buffer in active use. E.g., do not call `@no_escape` on a buffer that may be used by another task
+- ...not allow memory allocated with a buffer to be live after the underlying buffer has been reset
+- ...reset their buffers before it runs out of memory
 
 ## Safety
 
