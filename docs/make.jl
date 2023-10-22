@@ -15,6 +15,6 @@ makedocs(;
          pages=["Home" => "index.md",
                 "Allocator interface" => "interface.md"])
 
-deploydocs(; repo=Remotes.GitHub("ericphanson", "AllocArrays.jl"),
+deploydocs(; repo="github.com/ericphanson/AllocArrays.jl.git",
            push_preview=true,
            devbranch="main")
