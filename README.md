@@ -77,3 +77,4 @@ Note also:
   - This can be slow and allocation heavy, however, if there are many short-lived tasks that each allocate, since they will each need to be provisioned their own buffer.
 - Calling `unsafe_with_bumper(f, buf)` is not safe if allocations may occur concurrently. Since you may not know all the `similar` calls present in the code, this is a-priori dangerous to use.
 - Calling `with_locked_bumper(f, buf)` provides a safe alternative simply by using a lock to control access to `buf`. In this way, the single buffer `buf` will be used to allocate for all `similar` calls (even across threads/tasks).
+    - However, de-allocation is not safe with this approach, and `@no_escape` must be called outside of the threaded region.

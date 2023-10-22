@@ -155,7 +155,10 @@ allocate memory to `similar` calls on [`AllocArray`](@ref)s.
 All such allocations should occur within an `@no_escape` block,
 and of course, no such allocations should escape that block.
 
-Thread-safe: `f` may spawn multiple tasks or threads, which may each allocate memory using `similar` calls on `AllocArray`'s.
+Thread-safe: `f` may spawn multiple tasks or threads, which may each allocate memory using `similar` calls on `AllocArray`'s. However:
+
+!!! warning
+    `f` must call `@no_escape` only outside of the threaded region, because de-allocating memory (via `@no_escape`) is not concurrency-safe with this approach.
 
 ## Example
 
@@ -167,8 +170,8 @@ input = AllocArray([1,2,3])
 c = Channel(Inf)
 with_locked_bumper(buf) do
     # ...code with may be multithreaded but which must not escape or return newly-allocated AllocArrays...
-    @sync for i = 1:10
-        @no_escape buf begin
+    @no_escape buf begin # called outside of threaded region
+        @sync for i = 1:10
             Threads.@spawn put!(c, sum(input .+ i))
         end
     end
