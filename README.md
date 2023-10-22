@@ -75,7 +75,7 @@ The caller must:
 - nor allow memory allocated with a buffer to escape after the underlying buffer has been reset
 - and must reset their buffers before it runs out of memory
 
-### Safety
+## Safety
 
 Before using a bump allocator (`unsafe_with_bumper`, or `with_locked_bumper`) it is recommended the user read the [Bumper.jl README](https://github.com/MasonProtter/Bumper.jl#bumperjl) to understand how it works and what the limitations are.
 
