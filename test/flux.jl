@@ -1,4 +1,4 @@
-using Flux
+using Flux, Random
 
 model = Chain(Dense(1 => 23, tanh), Dense(23 => 1; bias=false), only)
 
@@ -90,13 +90,14 @@ model(AllocArray(data[1]))
 
 
 function infer!(predictions, model, data)
-    with_bumper() do
-        for (idx, x) in enumerate(data)
-            @no_escape begin
-                predictions[idx] .= model(x)
-            end
+    buf = Bumper.default_buffer()
+    # with_bumper() do
+    for (idx, x) in enumerate(data)
+        @no_escape buf begin
+            predictions[idx] .= model(x)
         end
     end
+    # end
     return predictions
 end
 
@@ -107,6 +108,5 @@ alloc_data = AllocArray.(data)
 # @time infer!(predictions, model, data);
 # @time infer!(predictions, model, data);
 
-# alloc_data = AllocArray.(data);
 # @time infer!(predictions, model, alloc_data);
 # @time infer!(predictions, model, alloc_data);
