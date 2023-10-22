@@ -7,21 +7,21 @@ version = "1.0.0"
 Adapt = "79e6a3ab-5dfb-504d-930d-738a2a938a0e"
 Bumper = "8ce10254-0962-460f-a3d8-1f77fea1446e"
 ScopedValues = "7e506255-f358-4e82-b7e4-beb19740aa63"
-StrideArraysCore = "7792a7ef-975c-4747-a70f-980b88e8d1da"
 
 [compat]
 Adapt = "3"
 Aqua = "0.7"
 Bumper = "0.3"
 ScopedValues = "1"
-StrideArraysCore = "0.5"
+StrideArraysCore = "0.5.1"
 julia = "1.8"
 
 [extras]
 Aqua = "4c88cf16-eb10-579e-8560-4a9242c79595"
 Flux = "587475ba-b771-5e3f-ad9e-33799f191a9c"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
+StrideArraysCore = "7792a7ef-975c-4747-a70f-980b88e8d1da"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["Aqua", "Flux", "Random", "Test"]
+test = ["Aqua", "Flux", "Random", "StrideArraysCore", "Test"]

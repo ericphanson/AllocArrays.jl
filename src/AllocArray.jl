@@ -71,10 +71,6 @@ end
 
 Base.elsize(::Type{<:AllocArray{T,N,Arr}}) where {T,N,Arr} = Base.elsize(Arr)
 
-# Piracy - shouldn't this be defined on the type level in StrideArraysCore?
-# https://github.com/JuliaSIMD/StrideArraysCore.jl/issues/44
-@inline Base.elsize(::Type{<:StrideArraysCore.AbstractStrideArray{T}}) where {T} = sizeof(T)
-
 Base.strides(a::AllocArray) = strides(getfield(a, :arr))
 
 #####
