@@ -84,7 +84,7 @@ end
 function infer!(predictions, model, data)
     buf = default_buffer()
     # Here we use a locked bumper for thread-safety, since NNlib multithreads
-    # some of it's functions.
+    # some of it's functions. However we are sure to only deallocate outside of the threaded region. (All concurrency occurs within the `model` call itself).
     with_locked_bumper(buf) do
         for (idx, x) in enumerate(data)
             @no_escape buf begin
