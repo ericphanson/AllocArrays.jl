@@ -48,14 +48,6 @@ function alloc_similar(B::BumperAllocator, ::Type{Arr}, dims::Dims) where {Arr}
     return Bumper.alloc(eltype(Arr), B.buf, dims...)
 end
 
-function with_bumper(f, buf)
-    old = CURRENT_ALLOCATOR[]
-    CURRENT_ALLOCATOR[] = BumperAllocator(buf)
-    try
-        return f()
-    finally
-        CURRENT_ALLOCATOR[] = old
-    end
+function with_bumper(f, buf...)
+    return scoped(f, CURRENT_ALLOCATOR => BumperAllocator(buf...))
 end
-
-with_bumper(f) = f()

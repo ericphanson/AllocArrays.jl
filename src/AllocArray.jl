@@ -16,11 +16,13 @@ end
 
 @inline Base.parent(a::AllocArray) = getfield(a, :arr)
 
-@inline Base.@propagate_inbounds function Base.setindex!(a::AllocArray{T,N}, value, I::Vararg{Int,N}) where {T,N}
+@inline Base.@propagate_inbounds function Base.setindex!(a::AllocArray{T,N}, value,
+                                                         I::Vararg{Int,N}) where {T,N}
     return setindex!(getfield(a, :arr), value, I...)
 end
 
-@inline Base.@propagate_inbounds function Base.getindex(a::AllocArray{T,N}, I::Vararg{Int,N}) where {T,N}
+@inline Base.@propagate_inbounds function Base.getindex(a::AllocArray{T,N},
+                                                        I::Vararg{Int,N}) where {T,N}
     return getindex(getfield(a, :arr), I...)
 end
 Base.size(a::AllocArray) = size(getfield(a, :arr))

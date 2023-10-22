@@ -1,4 +1,4 @@
-using Flux, Random
+using Flux, Random, StrideArraysCore
 
 model = Chain(Dense(1 => 23, tanh), Dense(23 => 1; bias=false), only)
 
@@ -111,7 +111,6 @@ alloc_data = AllocArray.(data)
 
 @showtime infer!(predictions, model, alloc_data);
 @showtime infer!(predictions, model, alloc_data);
-
 
 stride_data = StrideArray.(data)
 @showtime infer!(predictions, model, stride_data);
