@@ -9,6 +9,8 @@ This is accomplished by creating a wrapper type `AllocArray` which dispatches `s
 
 Demo:
 ```julia
+using AllocArrays, Bumper
+
 # Some function, possibly in some package,
 # that doesn't know about bumper, but happens to only use `similar`
 # to allocate memory
