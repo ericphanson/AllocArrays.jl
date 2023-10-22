@@ -1,14 +1,17 @@
 module AllocArrays
 
-using ScopedValues: ScopedValue, scoped
+using ScopedValues: ScopedValue, with
 using Bumper
+using Adapt
 
-export AllocArray, with_bumper
+# for some piracy
+using StrideArraysCore: StrideArraysCore
+
+export AllocArray, with_bumper, with_locked_bumper
 
 include("alloc_interface.jl")
+include("AllocArray.jl")
 
 const CURRENT_ALLOCATOR = ScopedValue{Allocator}(DEFAULT_ALLOCATOR)
-
-include("AllocArray.jl")
 
 end # module

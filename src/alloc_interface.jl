@@ -31,21 +31,48 @@ end
 ##### Bumper.jl
 #####
 
-# Could be moved to a package extension
+# Could be moved to a package extension?
 
-# We could add a field for the buffer instead of relying
-# on the default buffer. That might be important for working with CuArrays etc
-struct BumperAllocator <: Allocator end
+struct BumperAllocator{B<:Union{Nothing,AllocBuffer}} <: Allocator
+    buf::B
+end
 
-function alloc_similar(::BumperAllocator, arr, ::Type{T}, dims::Dims) where {T}
+BumperAllocator() = BumperAllocator(nothing)
+
+function alloc_similar(B::BumperAllocator, arr, ::Type{T}, dims::Dims) where {T}
     # ignore arr type for now
-    return Bumper.alloc(T, dims...)
+    return Bumper.alloc(T, @something(B.buf, default_buffer()), dims...)
 end
 
-function alloc_similar(::BumperAllocator, ::Type{Arr}, dims::Dims) where {Arr}
-    return Bumper.alloc(eltype(Arr), dims...)
+function alloc_similar(B::BumperAllocator, ::Type{Arr}, dims::Dims) where {Arr}
+    return Bumper.alloc(eltype(Arr), @something(B.buf, default_buffer()), dims...)
 end
 
-function with_bumper(f)
-    return scoped(f, CURRENT_ALLOCATOR => BumperAllocator())
+function with_bumper(f, buf...)
+    return with(f, CURRENT_ALLOCATOR => BumperAllocator(buf...))
+end
+
+#####
+##### LockedBumperAllocator
+#####
+
+# An alternative route to thread safety: just lock the allocator before using it.
+# This helps with short-lived tasks (which shouldn't each get their own buffer)
+
+struct LockedBumperAllocator{B<:AllocBuffer} <: Allocator
+    bumper::BumperAllocator{B}
+    lock::ReentrantLock
+end
+function LockedBumperAllocator(buf=default_buffer())
+    return LockedBumperAllocator(BumperAllocator(buf), ReentrantLock())
+end
+Base.lock(f::Function, B::LockedBumperAllocator) = lock(f, B.lock)
+Base.lock(B::LockedBumperAllocator) = lock(B.lock)
+Base.unlock(B::LockedBumperAllocator) = unlock(B.lock)
+
+function alloc_similar(B::LockedBumperAllocator, args...)
+    return @lock(B, alloc_similar(B.bumper, args...))
+end
+function with_locked_bumper(f, buf...)
+    return with(f, CURRENT_ALLOCATOR => LockedBumperAllocator(buf...))
 end
