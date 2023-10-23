@@ -38,4 +38,5 @@ end
     @test basic_reduction(a) == 2000.0
 
     include("flux.jl")
+    include("checked.jl")
 end

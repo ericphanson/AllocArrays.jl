@@ -3,7 +3,7 @@ using Base: Dims
 using Base.Broadcast: Broadcasted, ArrayStyle
 
 """
-    struct AllocArray{T, N,A<:AbstractArray{T,N}} <: AbstractArray{T,N}
+    struct AllocArray{T,N,A<:AbstractArray{T,N}} <: AbstractArray{T,N}
         arr::A
     end
 
