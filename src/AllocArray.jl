@@ -41,6 +41,8 @@ end
 
 Base.size(a::AllocArray) = size(getfield(a, :arr))
 
+Base.IndexStyle(::Type{<:AllocArray{T,N,Arr}}) where {T,N,Arr} = Base.IndexStyle(Arr)
+
 # used only by broadcasting?
 function Base.similar(::Type{AllocArray{T,N,Arr}}, dims::Dims) where {T,N,Arr}
     # TODO- I think this shouldn't be `Array{T}`,
@@ -48,15 +50,13 @@ function Base.similar(::Type{AllocArray{T,N,Arr}}, dims::Dims) where {T,N,Arr}
     # want to respect here. We want some `generic_type(Arr)` where is `Array{T}`
     # for `Vector` etc, but would be `CuArray` for `CuVector` etc.
     inner = alloc_similar(CURRENT_ALLOCATOR[], Array{T}, dims)
-    return AllocArray(inner)
+    return AllocArray(inner)::AllocArray
 end
 
 function Base.similar(a::AllocArray, ::Type{T}, dims::Dims) where {T}
     inner = alloc_similar(CURRENT_ALLOCATOR[], getfield(a, :arr), T, dims)
-    return AllocArray(inner)
+    return AllocArray(inner)::AllocArray
 end
-
-Base.IndexStyle(::Type{<:AllocArray{T,N,Arr}}) where {T,N,Arr} = Base.IndexStyle(Arr)
 
 #####
 ##### Broadcasting
@@ -68,7 +68,7 @@ end
 
 function Base.similar(bc::Broadcasted{ArrayStyle{AllocArray{T,N,Arr}}},
                       ::Type{ElType}) where {T,N,Arr,ElType}
-    return similar(AllocArray{T,N,Arr}, axes(bc))
+    return similar(AllocArray{T,N,Arr}, axes(bc))::AllocArray
 end
 
 #####
@@ -104,10 +104,11 @@ function Base.view(a::AllocArray{T,N},
 end
 
 # Speedup: avoid generic matmul methods
-Base.:(*)(x::AllocMatrix, y::AbstractMatrix) = AllocArray(parent(x) * y)
-Base.:(*)(x::AbstractMatrix, y::AllocMatrix) = AllocArray(x * parent(y))
-Base.:(*)(x::AllocMatrix, y::AllocMatrix) = AllocArray(parent(x) * parent(y))
+# These unfortunately cause ambiguities, so are commented out for now
+# Base.:(*)(x::AllocMatrix, y::AbstractMatrix) = AllocArray(parent(x) * y)
+# Base.:(*)(x::AbstractMatrix, y::AllocMatrix) = AllocArray(x * parent(y))
+# Base.:(*)(x::AllocMatrix, y::AllocMatrix) = AllocArray(parent(x) * parent(y))
 
-Base.:(*)(x::AllocMatrix, y::AbstractVector) = AllocArray(parent(x) * y)
-Base.:(*)(x::AbstractMatrix, y::AllocVector) = AllocArray(x * parent(y))
-Base.:(*)(x::AllocMatrix, y::AllocVector) = AllocArray(parent(x) * parent(y))
+# Base.:(*)(x::AllocMatrix, y::AbstractVector) = AllocArray(parent(x) * y)
+# Base.:(*)(x::AbstractMatrix, y::AllocVector) = AllocArray(x * parent(y))
+# Base.:(*)(x::AllocMatrix, y::AllocVector) = AllocArray(parent(x) * parent(y))
