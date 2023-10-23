@@ -129,4 +129,11 @@ end
     @showtime infer!(predictions, model, data)
     @showtime infer!(predictions, model, stride_data)
     @showtime infer!(predictions, model, alloc_data)
+
+    # Note: for max perf, consider
+    # (using Functors)
+    # model = fmap(AllocArray ∘ PtrArray, model; exclude = x -> x isa AbstractArray)
+    # and `alloc_data = AllocArray.(PtrArray.(data))`
+    # Together, that ensure everything is an `AllocArray(PtrArray(...))`
+    # This seems to help although not a huge amount.
 end

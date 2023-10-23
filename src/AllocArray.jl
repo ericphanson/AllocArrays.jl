@@ -14,6 +14,9 @@ struct AllocArray{T,N,A<:AbstractArray{T,N}} <: AbstractArray{T,N}
     arr::A
 end
 
+AllocMatrix{T,A<:AbstractMatrix{T}} = AllocArray{T,2,A}
+AllocVector{T,A<:AbstractVector{T}} = AllocArray{T,1,A}
+
 @inline Base.parent(a::AllocArray) = getfield(a, :arr)
 
 @inline Base.@propagate_inbounds function Base.setindex!(a::AllocArray{T,N}, value,
@@ -21,11 +24,24 @@ end
     return setindex!(getfield(a, :arr), value, I...)
 end
 
+@inline Base.@propagate_inbounds function Base.setindex!(a::AllocArray{T,N}, value,
+                                                         I::Int) where {T,N}
+    return setindex!(getfield(a, :arr), value, I)
+end
+
 @inline Base.@propagate_inbounds function Base.getindex(a::AllocArray{T,N},
                                                         I::Vararg{Int,N}) where {T,N}
     return getindex(getfield(a, :arr), I...)
 end
+
+@inline Base.@propagate_inbounds function Base.getindex(a::AllocArray{T,N},
+                                                        I::Int) where {T,N}
+    return getindex(getfield(a, :arr), I)
+end
+
 Base.size(a::AllocArray) = size(getfield(a, :arr))
+
+Base.IndexStyle(::Type{<:AllocArray{T,N,Arr}}) where {T,N,Arr} = Base.IndexStyle(Arr)
 
 # used only by broadcasting?
 function Base.similar(::Type{AllocArray{T,N,Arr}}, dims::Dims) where {T,N,Arr}
@@ -34,12 +50,12 @@ function Base.similar(::Type{AllocArray{T,N,Arr}}, dims::Dims) where {T,N,Arr}
     # want to respect here. We want some `generic_type(Arr)` where is `Array{T}`
     # for `Vector` etc, but would be `CuArray` for `CuVector` etc.
     inner = alloc_similar(CURRENT_ALLOCATOR[], Array{T}, dims)
-    return AllocArray(inner)
+    return AllocArray(inner)::AllocArray
 end
 
 function Base.similar(a::AllocArray, ::Type{T}, dims::Dims) where {T}
     inner = alloc_similar(CURRENT_ALLOCATOR[], getfield(a, :arr), T, dims)
-    return AllocArray(inner)
+    return AllocArray(inner)::AllocArray
 end
 
 #####
@@ -52,7 +68,7 @@ end
 
 function Base.similar(bc::Broadcasted{ArrayStyle{AllocArray{T,N,Arr}}},
                       ::Type{ElType}) where {T,N,Arr,ElType}
-    return similar(AllocArray{T,N,Arr}, axes(bc))
+    return similar(AllocArray{T,N,Arr}, axes(bc))::AllocArray
 end
 
 #####
@@ -86,3 +102,13 @@ function Base.view(a::AllocArray{T,N},
                    i::Vararg{Union{Integer,AbstractRange,Colon},N}) where {T,N}
     return AllocArray(view(getfield(a, :arr), i...))
 end
+
+# Speedup: avoid generic matmul methods
+# These unfortunately cause ambiguities, so are commented out for now
+# Base.:(*)(x::AllocMatrix, y::AbstractMatrix) = AllocArray(parent(x) * y)
+# Base.:(*)(x::AbstractMatrix, y::AllocMatrix) = AllocArray(x * parent(y))
+# Base.:(*)(x::AllocMatrix, y::AllocMatrix) = AllocArray(parent(x) * parent(y))
+
+# Base.:(*)(x::AllocMatrix, y::AbstractVector) = AllocArray(parent(x) * y)
+# Base.:(*)(x::AbstractMatrix, y::AllocVector) = AllocArray(x * parent(y))
+# Base.:(*)(x::AllocMatrix, y::AllocVector) = AllocArray(parent(x) * parent(y))
