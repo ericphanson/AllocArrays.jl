@@ -16,7 +16,7 @@ export with_allocator
 export DefaultAllocator
 
 # bump allocator support
-export bumper, BumperAllocator, UncheckedBumperAllocator, reset!
+export BumperAllocator, UncheckedBumperAllocator, reset!
 
 include("AllocArray.jl")
 include("CheckedAllocArray.jl")

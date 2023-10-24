@@ -77,8 +77,6 @@ function reset!(B::BumperAllocator)
     return nothing
 end
 
-bumper(b) = BumperAllocator(b)
-
 function with_allocator(f, b)
     return with(f, CURRENT_ALLOCATOR => b)
 end

@@ -26,7 +26,7 @@ Allocations inside `@no_escape` must not escape!
 
 ```@repl ex
 function bad_function_1(a)
-    b = bumper(2^25)
+    b = BumpAllocator(2^25)
     output = []
     with_allocator(b) do
         result = some_allocating_function(a)
@@ -43,7 +43,7 @@ Here is a corrected version:
 
 ```@repl ex
 function good_function_1(a)
-    b = bumper(2^25)
+    b = BumpAllocator(2^25)
 
     # note, we are not inside `with_allocator`, so we are not making buffer-backed memory
     output = similar(a)
@@ -64,7 +64,7 @@ good_function_1(AllocArray([1]))
 
 ```@repl ex
 function bad_function_2(a)
-    b = bumper(2^25)
+    b = BumpAllocator(2^25)
     output = Channel(Inf)
     with_allocator(b) do
         @sync for _ = 1:10
@@ -86,7 +86,7 @@ Here is a corrected version:
 
 ```@repl ex
 function good_function_2(a)
-    b = bumper(2^25)
+    b = BumpAllocator(2^25)
     output = Channel(Inf)
     with_allocator(b) do
         @sync for _ = 1:10
@@ -108,7 +108,7 @@ Or, if we need to reset multiple times as we process the data, we could do a ser
 
 ```@repl ex
 function good_function_2b(a)
-    b = bumper(2^25)
+    b = BumpAllocator(2^25)
     output = Channel(Inf)
     with_allocator(b) do
         for _ = 1:10
@@ -132,7 +132,7 @@ As shown above, we must be careful about when we reset the buffer. However, if w
 
 ```julia
 function bad_function_3(a, N)
-    b = bumper(2^25)
+    b = BumpAllocator(2^25)
     output = Channel(Inf)
     with_allocator(b) do
         for _ = 1:N # bad! we are going to allocate `N` times without resetting!
