@@ -96,13 +96,3 @@ function Base.view(a::AllocArray{T,N},
                    i::Vararg{Union{Integer,AbstractRange,Colon},N}) where {T,N}
     return AllocArray(view(getfield(a, :arr), i...))
 end
-
-# Speedup: avoid generic matmul methods
-# These unfortunately cause ambiguities, so are commented out for now
-# Base.:(*)(x::AllocMatrix, y::AbstractMatrix) = AllocArray(parent(x) * y)
-# Base.:(*)(x::AbstractMatrix, y::AllocMatrix) = AllocArray(x * parent(y))
-# Base.:(*)(x::AllocMatrix, y::AllocMatrix) = AllocArray(parent(x) * parent(y))
-
-# Base.:(*)(x::AllocMatrix, y::AbstractVector) = AllocArray(parent(x) * y)
-# Base.:(*)(x::AbstractMatrix, y::AllocVector) = AllocArray(x * parent(y))
-# Base.:(*)(x::AllocMatrix, y::AllocVector) = AllocArray(parent(x) * parent(y))
