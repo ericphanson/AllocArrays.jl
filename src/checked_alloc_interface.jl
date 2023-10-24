@@ -5,12 +5,12 @@
 # Then there are 3 options:
 # - UncheckedBumperAllocator: no protection
 # - OnlyLockedBumperAllocator: wraps UncheckedBumperAllocator, adds concurrency protection
-# - CheckedBumperAllocator: wraps UncheckedBumperAllocator, adds both concurrency and memory safety
+# - BumperAllocator: wraps UncheckedBumperAllocator, adds both concurrency and memory safety
 # ...
 # this interface means the central object the user creates is these allocator types
 # then they call our `reset!`. Not `@no_escape`.
 # Should we have a `try/finally` interface?
-struct CheckedBumperAllocator{B} <: Allocator
+struct BumperAllocator{B} <: Allocator
     bumper::B
     mems::Vector{MemValid}
     # this lock protects access to `mems` and `buf`, and ensures
@@ -18,14 +18,14 @@ struct CheckedBumperAllocator{B} <: Allocator
     lock::ReentrantLock
 end
 
-function CheckedBumperAllocator(B::AllocBuffer)
-    return CheckedBumperAllocator(UncheckedBumperAllocator(B), MemValid[], ReentrantLock())
+function BumperAllocator(B::AllocBuffer)
+    return BumperAllocator(UncheckedBumperAllocator(B), MemValid[], ReentrantLock())
 end
 
-Base.lock(B::CheckedBumperAllocator) = lock(B.lock)
-Base.unlock(B::CheckedBumperAllocator) = unlock(B.lock)
+Base.lock(B::BumperAllocator) = lock(B.lock)
+Base.unlock(B::BumperAllocator) = unlock(B.lock)
 
-function alloc_similar(B::CheckedBumperAllocator, c::CheckedAllocArray, ::Type{T},
+function alloc_similar(B::BumperAllocator, c::CheckedAllocArray, ::Type{T},
                        dims::Dims) where {T}
     @lock B begin
         # I think we do still need C's read lock, bc it could have been
@@ -38,7 +38,7 @@ function alloc_similar(B::CheckedBumperAllocator, c::CheckedAllocArray, ::Type{T
     end
 end
 
-function alloc_similar(B::CheckedBumperAllocator, ::Type{CheckedAllocArray{T,N,Arr}},
+function alloc_similar(B::BumperAllocator, ::Type{CheckedAllocArray{T,N,Arr}},
                        dims::Dims) where {T,N,Arr}
     @lock B begin
         inner = alloc_similar(B.bumper, Arr, dims)
@@ -60,7 +60,7 @@ function reset!(B::UncheckedBumperAllocator)
     return nothing
 end
 
-function reset!(B::CheckedBumperAllocator)
+function reset!(B::BumperAllocator)
     @lock B begin
         # Invalidate all memory first
         for mem in B.mems
@@ -75,21 +75,21 @@ function reset!(B::CheckedBumperAllocator)
     return nothing
 end
 
-# If we have a `CheckedBumperAllocator` and are asked to allocate an unchecked array
+# If we have a `BumperAllocator` and are asked to allocate an unchecked array
 # then we can do that by dispatching to the inner bumper. We will still
 # get the lock for concurrency-safety.
 # I.e. we are acting just like a `OnlyLockedBumperAllocator` in this case.
-function alloc_similar(B::CheckedBumperAllocator, ::Type{AllocArray{T,N,Arr}},
+function alloc_similar(B::BumperAllocator, ::Type{AllocArray{T,N,Arr}},
                        dims::Dims) where {T,N,Arr}
     return @lock(B, alloc_similar(B.bumper, AllocArray{T,N,Arr}, dims))
 end
 
-function alloc_similar(B::CheckedBumperAllocator, a::AllocArray, ::Type{T},
+function alloc_similar(B::BumperAllocator, a::AllocArray, ::Type{T},
                        dims::Dims) where {T}
     return @lock(B, alloc_similar(B.bumper, a, T, dims))
 end
 
-bumper(b::AllocBuffer) = CheckedBumperAllocator(b)
+bumper(b::AllocBuffer) = BumperAllocator(b)
 
 function with_allocator(f, b)
     return with(f, CURRENT_ALLOCATOR => b)
