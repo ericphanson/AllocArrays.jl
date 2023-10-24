@@ -38,16 +38,16 @@ end
 
 # Could be moved to a package extension?
 
-struct BumperAllocator{B<:AllocBuffer} <: Allocator
+struct UncheckedBumperAllocator{B<:AllocBuffer} <: Allocator
     buf::B
 end
 
-function alloc_similar(B::BumperAllocator, ::AllocArray, ::Type{T}, dims::Dims) where {T}
+function alloc_similar(B::UncheckedBumperAllocator, ::AllocArray, ::Type{T}, dims::Dims) where {T}
     inner = Bumper.alloc(T, B.buf, dims...)
     return AllocArray(inner)
 end
 
-function alloc_similar(B::BumperAllocator, ::Type{AllocArray{T,N,Arr}}, dims::Dims) where {T, N, Arr}
+function alloc_similar(B::UncheckedBumperAllocator, ::Type{AllocArray{T,N,Arr}}, dims::Dims) where {T, N, Arr}
     inner = Bumper.alloc(T, B.buf, dims...)
     return AllocArray(inner)
 end
@@ -55,7 +55,7 @@ end
 """
     unsafe_with_bumper(f, buf::AllocBuffer)
 
-Runs `f()` in the context of using a `BumperAllocator{typeof(buf)}` to
+Runs `f()` in the context of using a `UncheckedBumperAllocator{typeof(buf)}` to
 allocate memory to `similar` calls on [`AllocArray`](@ref)s.
 
 All such allocations should occur within an `@no_escape` block,
@@ -88,7 +88,7 @@ end
 ```
 """
 function unsafe_with_bumper(f, buf::AllocBuffer)
-    return with(f, CURRENT_ALLOCATOR => BumperAllocator(buf))
+    return with(f, CURRENT_ALLOCATOR => UncheckedBumperAllocator(buf))
 end
 
 #####
@@ -104,7 +104,7 @@ struct LockedBumperAllocator{A} <: Allocator
 end
 
 function LockedBumperAllocator(buf::AllocBuffer)
-    return LockedBumperAllocator(BumperAllocator(buf), ReentrantLock())
+    return LockedBumperAllocator(UncheckedBumperAllocator(buf), ReentrantLock())
 end
 
 function LockedBumperAllocator(b)

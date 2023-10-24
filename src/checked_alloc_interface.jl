@@ -1,11 +1,11 @@
 # TODO-
-# This should wrap a `BumperAllocator`
+# This should wrap a `UncheckedBumperAllocator`
 # Then if get an `AllocArray`, we just forward to that and don't do any checking
 # If we get a `CheckedAllocArray`, we go through the checking route
 # Then there are 3 options:
-# - BumperAllocator: no protection
-# - LockedBumperAllocator: wraps BumperAllocator, adds concurrency protection
-# - CheckedBumperAllocator: wraps BumperAllocator, adds both concurrency and memory safety
+# - UncheckedBumperAllocator: no protection
+# - LockedBumperAllocator: wraps UncheckedBumperAllocator, adds concurrency protection
+# - CheckedBumperAllocator: wraps UncheckedBumperAllocator, adds both concurrency and memory safety
 # ...
 # this interface means the central object the user creates is these allocator types
 # then they call our `reset!`. Not `@no_escape`.
@@ -19,7 +19,7 @@ struct CheckedBumperAllocator{B} <: Allocator
 end
 
 function CheckedBumperAllocator(B::AllocBuffer)
-    return CheckedBumperAllocator(BumperAllocator(B), MemValid[], ReentrantLock())
+    return CheckedBumperAllocator(UncheckedBumperAllocator(B), MemValid[], ReentrantLock())
 end
 
 Base.lock(B::CheckedBumperAllocator) = lock(B.lock)
@@ -55,7 +55,7 @@ function reset!(B::LockedBumperAllocator)
     return nothing
 end
 
-function reset!(B::BumperAllocator)
+function reset!(B::UncheckedBumperAllocator)
     Bumper.reset_buffer!(B.buf)
     return nothing
 end
