@@ -31,14 +31,6 @@ function alloc_similar(::DefaultAllocator, ::Type{AllocArray{T,N,Arr}},
     return similar(Arr, dims)
 end
 
-function alloc_similar(::DefaultAllocator, ::CheckedAllocArray, ::Type{T}, dims::Dims) where {T}
-    return similar(Array{T}, dims)
-end
-
-function alloc_similar(::DefaultAllocator, ::Type{CheckedAllocArray{T,N,Arr}},
-                       dims::Dims) where {T, N, Arr}
-    return similar(Arr, dims)
-end
 
 #####
 ##### Bumper.jl

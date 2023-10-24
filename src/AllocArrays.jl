@@ -5,9 +5,18 @@ using Bumper
 using Adapt
 using ConcurrentUtilities
 
-export AllocArray, with_locked_bumper
-export CheckedAllocArray, with_checked_bumper_no_escape, InvalidMemoryException
-export bumper, with_bumper, reset!
+# Two array types
+export AllocArray
+export CheckedAllocArray, InvalidMemoryException
+
+# how to use an allocator
+export with_allocator
+
+# default allocator
+export DefaultAllocator
+
+# bump allocator support
+export bumper, CheckedBumperAllocator, LockedBumperAllocator, BumperAllocator, reset!
 
 include("AllocArray.jl")
 include("alloc_interface.jl")

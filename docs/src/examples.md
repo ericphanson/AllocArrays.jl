@@ -28,7 +28,7 @@ Allocations inside `@no_escape` must not escape!
 function bad_function_1(a)
     b = bumper(AllocBuffer(2^25))
     output = []
-    with_bumper(b) do
+    with_allocator(b) do
         result = some_allocating_function(a)
         push!(output, result.b) # wrong! `b` is escaping `@no_escape`!
         reset!(b)
@@ -45,10 +45,10 @@ Here is a corrected version:
 function good_function_1(a)
     buf = AllocBuffer()
 
-    # note, we are not inside `with_bumper`, so we are not making buffer-backed memory
+    # note, we are not inside `with_allocator`, so we are not making buffer-backed memory
     output = similar(a)
 
-    with_bumper(buf) do
+    with_allocator(buf) do
         @no_escape buf begin
             result = some_allocating_function(a)
             output .= result.b # OK! we are copying buffer-backed memory into our heap-allocated memory
@@ -67,7 +67,7 @@ good_function_1(AllocArray([1]))
 function bad_function_2(a)
     buf = AllocBuffer()
     output = Channel(Inf)
-    with_bumper(buf) do
+    with_allocator(buf) do
         @sync for _ = 1:10
             Threads.@spawn begin
                 @no_escape buf begin
@@ -90,7 +90,7 @@ Here is a corrected version:
 function good_function_2(a)
     buf = AllocBuffer()
     output = Channel(Inf)
-    with_bumper(buf) do
+    with_allocator(buf) do
         @no_escape buf begin
             @sync for _ = 1:10
                 Threads.@spawn begin
@@ -113,7 +113,7 @@ Or, if we need to reset multiple times as we process the data, we could do a ser
 function good_function_2b(a)
     buf = AllocBuffer()
     output = Channel(Inf)
-    with_bumper(buf) do
+    with_allocator(buf) do
         for _ = 1:10
             @no_escape buf begin
                 scalar = basic_reduction(a)
@@ -138,7 +138,7 @@ As shown above, we must be careful about when we reset the buffer. However, if w
 function bad_function_3(a, N)
     buf = AllocBuffer()
     output = Channel(Inf)
-    with_bumper(buf) do
+    with_allocator(buf) do
         for _ = 1:N # bad! we are going to allocate `N` times without resetting!
             # if `N` is very large, we will run out of memory.
             scalar = basic_reduction(a)

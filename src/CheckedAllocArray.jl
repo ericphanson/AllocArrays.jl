@@ -34,7 +34,6 @@ struct CheckedAllocArray{T,N,A <: AllocArray{T,N}} <: AbstractArray{T,N}
 end
 
 CheckedAllocArray(arr::AbstractArray) = CheckedAllocArray(AllocArray(arr), MemValid(true))
-CheckedAllocArray(arr::AbstractArray, valid::MemValid) = CheckedAllocArray(AllocArray(arr), valid)
 
 struct InvalidMemoryException <: Base.Exception end
 
