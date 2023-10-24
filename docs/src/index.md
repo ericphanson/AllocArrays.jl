@@ -11,8 +11,6 @@ See also the README at that link for more examples and notes.
 
 ```@docs
 AllocArray
-with_locked_bumper
-AllocArrays.unsafe_with_bumper
 ```
 
 ```@docs

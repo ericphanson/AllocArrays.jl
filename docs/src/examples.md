@@ -26,7 +26,7 @@ Allocations inside `@no_escape` must not escape!
 
 ```@repl ex
 function bad_function_1(a)
-    b = bumper(AllocBuffer(2^25))
+    b = bumper(2^25)
     output = []
     with_allocator(b) do
         result = some_allocating_function(a)
@@ -43,18 +43,17 @@ Here is a corrected version:
 
 ```@repl ex
 function good_function_1(a)
-    buf = AllocBuffer()
+    b = bumper(2^25)
 
     # note, we are not inside `with_allocator`, so we are not making buffer-backed memory
     output = similar(a)
 
-    with_allocator(buf) do
-        @no_escape buf begin
-            result = some_allocating_function(a)
-            output .= result.b # OK! we are copying buffer-backed memory into our heap-allocated memory
-        end
+    with_allocator(b) do
+        result = some_allocating_function(a)
+        output .= result.b # OK! we are copying buffer-backed memory into our heap-allocated memory
+        reset!(b)
     end
-    return sum(result)
+    return sum(output)
 end
 
 good_function_1(AllocArray([1]))
@@ -65,15 +64,14 @@ good_function_1(AllocArray([1]))
 
 ```@repl ex
 function bad_function_2(a)
-    buf = AllocBuffer()
+    b = bumper(2^25)
     output = Channel(Inf)
-    with_allocator(buf) do
+    with_allocator(b) do
         @sync for _ = 1:10
             Threads.@spawn begin
-                @no_escape buf begin
-                    scalar = basic_reduction(a)
-                    put!(output, scalar)
-                end # wrong! we cannot reset here as `buf` is being used on other tasks
+                scalar = basic_reduction(a)
+                put!(output, scalar)
+                reset!(b) # wrong! we cannot reset here as `b` is being used on other tasks
             end
         end
     end
@@ -88,17 +86,16 @@ Here is a corrected version:
 
 ```@repl ex
 function good_function_2(a)
-    buf = AllocBuffer()
+    b = bumper(2^25)
     output = Channel(Inf)
-    with_allocator(buf) do
-        @no_escape buf begin
-            @sync for _ = 1:10
-                Threads.@spawn begin
-                    scalar = basic_reduction(a)
-                    put!(output, scalar)
-                end
+    with_allocator(b) do
+        @sync for _ = 1:10
+            Threads.@spawn begin
+                scalar = basic_reduction(a)
+                put!(output, scalar)
             end
-        end # OK! resetting once we no longer need the allocations
+        end
+        reset!(b) # OK! resetting once we no longer need the allocations
     end
     close(output)
     return sum(collect(output))
@@ -111,14 +108,13 @@ Or, if we need to reset multiple times as we process the data, we could do a ser
 
 ```@repl ex
 function good_function_2b(a)
-    buf = AllocBuffer()
+    b = bumper(2^25)
     output = Channel(Inf)
-    with_allocator(buf) do
+    with_allocator(b) do
         for _ = 1:10
-            @no_escape buf begin
-                scalar = basic_reduction(a)
-                put!(output, scalar)
-            end # OK to reset here! buffer-backed memory is not being used
+            scalar = basic_reduction(a)
+            put!(output, scalar)
+            reset!(b) # OK to reset here! buffer-backed memory is not being used
         end
     end
     close(output)
@@ -136,9 +132,9 @@ As shown above, we must be careful about when we reset the buffer. However, if w
 
 ```julia
 function bad_function_3(a, N)
-    buf = AllocBuffer()
+    b = bumper(2^25)
     output = Channel(Inf)
-    with_allocator(buf) do
+    with_allocator(b) do
         for _ = 1:N # bad! we are going to allocate `N` times without resetting!
             # if `N` is very large, we will run out of memory.
             scalar = basic_reduction(a)

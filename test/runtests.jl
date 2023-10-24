@@ -15,7 +15,7 @@ function basic_reduction(a)
 end
 
 function bumper_reduction(a)
-    buf = AllocBuffer(2^24) # 16 MiB
+    buf = BumperAllocator(AllocBuffer(2^24)) # 16 MiB
     with_locked_bumper(buf) do
         @no_escape buf begin
             basic_reduction(a)

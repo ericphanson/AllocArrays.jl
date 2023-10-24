@@ -66,7 +66,7 @@ or not! It is safer to use [`with_locked_bumper`](@ref) for this reason.
 
 ## Example
 
-```jldoctest
+```
 using AllocArrays, Bumper
 using AllocArrays: unsafe_with_bumper
 

@@ -21,6 +21,8 @@ function BumperAllocator(B::AllocBuffer)
     return BumperAllocator(UncheckedBumperAllocator(B), MemValid[], ReentrantLock())
 end
 
+BumperAllocator(n::Int) = BumperAllocator(AllocBuffer(n))
+
 Base.lock(B::BumperAllocator) = lock(B.lock)
 Base.unlock(B::BumperAllocator) = unlock(B.lock)
 
@@ -47,6 +49,18 @@ function alloc_similar(B::BumperAllocator, ::Type{CheckedAllocArray{T,N,Arr}},
     end
 end
 
+# If we have a `BumperAllocator` and are asked to allocate an unchecked array
+# then we can do that by dispatching to the inner bumper. We will still
+# get the lock for concurrency-safety.
+function alloc_similar(B::BumperAllocator, ::Type{AllocArray{T,N,Arr}},
+                       dims::Dims) where {T,N,Arr}
+    return @lock(B, alloc_similar(B.bumper, AllocArray{T,N,Arr}, dims))
+end
+
+function alloc_similar(B::BumperAllocator, a::AllocArray, ::Type{T},
+                       dims::Dims) where {T}
+    return @lock(B, alloc_similar(B.bumper, a, T, dims))
+end
 
 function reset!(B::BumperAllocator)
     @lock B begin
@@ -63,20 +77,7 @@ function reset!(B::BumperAllocator)
     return nothing
 end
 
-# If we have a `BumperAllocator` and are asked to allocate an unchecked array
-# then we can do that by dispatching to the inner bumper. We will still
-# get the lock for concurrency-safety.
-function alloc_similar(B::BumperAllocator, ::Type{AllocArray{T,N,Arr}},
-                       dims::Dims) where {T,N,Arr}
-    return @lock(B, alloc_similar(B.bumper, AllocArray{T,N,Arr}, dims))
-end
-
-function alloc_similar(B::BumperAllocator, a::AllocArray, ::Type{T},
-                       dims::Dims) where {T}
-    return @lock(B, alloc_similar(B.bumper, a, T, dims))
-end
-
-bumper(b::AllocBuffer) = BumperAllocator(b)
+bumper(b) = BumperAllocator(b)
 
 function with_allocator(f, b)
     return with(f, CURRENT_ALLOCATOR => b)
