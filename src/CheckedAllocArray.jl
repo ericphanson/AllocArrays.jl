@@ -34,11 +34,19 @@ struct CheckedAllocArray{T,N,A <: AllocArray{T,N}} <: AbstractArray{T,N}
 end
 
 CheckedAllocArray(arr::AbstractArray) = CheckedAllocArray(AllocArray(arr), MemValid(true))
+CheckedAllocArray(arr::AbstractArray, valid::MemValid) = CheckedAllocArray(AllocArray(arr), valid)
+
+struct InvalidMemoryException <: Base.Exception end
+
+function Base.showerror(io::IO, ::InvalidMemoryException)
+    print(io, "InvalidMemoryException:")
+    print(io, " Array accessed after its memory has been deallocated.")
+end
 
 # We must be already inside the read lock
 function _get_inner(a::CheckedAllocArray)
     is_valid = a.valid.valid
-    is_valid || error("Invalid!")
+    is_valid || throw(InvalidMemoryException())
     return a.alloc_array
 end
 
@@ -87,19 +95,11 @@ Base.IndexStyle(::Type{<:CheckedAllocArray{T,N,Arr}}) where {T,N,Arr} = Base.Ind
 
 # used only by broadcasting?
 function Base.similar(::Type{CheckedAllocArray{T,N,Arr}}, dims::Dims) where {T,N,Arr}
-    # TODO- I think this shouldn't be `Array{T}`,
-    # but if we do `Arr`, then we are passing dimensionality info we don't necessarily
-    # want to respect here. We want some `generic_type(Arr)` where is `Array{T}`
-    # for `Vector` etc, but would be `CuArray` for `CuVector` etc.
-    inner, valid = alloc_checked_similar(CURRENT_ALLOCATOR[], Array{T}, dims)
-    return CheckedAllocArray(AllocArray(inner), valid)::CheckedAllocArray
+    return alloc_similar(CURRENT_ALLOCATOR[], CheckedAllocArray{T,N,Arr}, dims)
 end
 
 function Base.similar(a::CheckedAllocArray, ::Type{T}, dims::Dims) where {T}
-    @lock a begin
-        inner, valid = alloc_checked_similar(CURRENT_ALLOCATOR[], _get_inner(a), T, dims)
-        return CheckedAllocArray(AllocArray(inner), valid)::CheckedAllocArray
-    end
+    return alloc_similar(CURRENT_ALLOCATOR[], a, T, dims)
 end
 
 #####

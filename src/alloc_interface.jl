@@ -22,12 +22,21 @@ struct DefaultAllocator <: Allocator end
 
 const DEFAULT_ALLOCATOR = DefaultAllocator()
 
-function alloc_similar(::DefaultAllocator, arr, ::Type{T}, dims::Dims) where {T}
-    return similar(arr, T, dims)
+function alloc_similar(::DefaultAllocator, ::AllocArray, ::Type{T}, dims::Dims) where {T}
+    return similar(Array{T}, dims)
 end
 
-function alloc_similar(::DefaultAllocator, ::Type{Arr},
-                       dims::Dims) where {Arr<:AbstractArray}
+function alloc_similar(::DefaultAllocator, ::Type{AllocArray{T,N,Arr}},
+                       dims::Dims) where {T, N, Arr}
+    return similar(Arr, dims)
+end
+
+function alloc_similar(::DefaultAllocator, ::CheckedAllocArray, ::Type{T}, dims::Dims) where {T}
+    return similar(Array{T}, dims)
+end
+
+function alloc_similar(::DefaultAllocator, ::Type{CheckedAllocArray{T,N,Arr}},
+                       dims::Dims) where {T, N, Arr}
     return similar(Arr, dims)
 end
 
@@ -41,13 +50,14 @@ struct BumperAllocator{B<:AllocBuffer} <: Allocator
     buf::B
 end
 
-function alloc_similar(B::BumperAllocator, arr, ::Type{T}, dims::Dims) where {T}
-    # ignore arr type for now
-    return Bumper.alloc(T, B.buf, dims...)
+function alloc_similar(B::BumperAllocator, ::AllocArray, ::Type{T}, dims::Dims) where {T}
+    inner = Bumper.alloc(T, B.buf, dims...)
+    return AllocArray(inner)
 end
 
-function alloc_similar(B::BumperAllocator, ::Type{Arr}, dims::Dims) where {Arr}
-    return Bumper.alloc(eltype(Arr), B.buf, dims...)
+function alloc_similar(B::BumperAllocator, ::Type{AllocArray{T,N,Arr}}, dims::Dims) where {T, N, Arr}
+    inner = Bumper.alloc(T, B.buf, dims...)
+    return AllocArray(inner)
 end
 
 """
@@ -96,12 +106,17 @@ end
 # An alternative route to thread safety: just lock the allocator before using it.
 # This helps with short-lived tasks (which shouldn't each get their own buffer)
 
-struct LockedBumperAllocator{B<:AllocBuffer} <: Allocator
-    bumper::BumperAllocator{B}
+struct LockedBumperAllocator{A} <: Allocator
+    bumper::A
     lock::ReentrantLock
 end
+
 function LockedBumperAllocator(buf::AllocBuffer)
     return LockedBumperAllocator(BumperAllocator(buf), ReentrantLock())
+end
+
+function LockedBumperAllocator(b)
+    return LockedBumperAllocator(b, ReentrantLock())
 end
 Base.lock(f::Function, B::LockedBumperAllocator) = lock(f, B.lock)
 Base.lock(B::LockedBumperAllocator) = lock(B.lock)
@@ -127,7 +142,7 @@ Thread-safe: `f` may spawn multiple tasks or threads, which may each allocate me
 
 ## Example
 
-```jldoctest
+```
 using AllocArrays, Bumper
 
 buf = AllocBuffer()

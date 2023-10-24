@@ -45,17 +45,11 @@ Base.IndexStyle(::Type{<:AllocArray{T,N,Arr}}) where {T,N,Arr} = Base.IndexStyle
 
 # used only by broadcasting?
 function Base.similar(::Type{AllocArray{T,N,Arr}}, dims::Dims) where {T,N,Arr}
-    # TODO- I think this shouldn't be `Array{T}`,
-    # but if we do `Arr`, then we are passing dimensionality info we don't necessarily
-    # want to respect here. We want some `generic_type(Arr)` where is `Array{T}`
-    # for `Vector` etc, but would be `CuArray` for `CuVector` etc.
-    inner = alloc_similar(CURRENT_ALLOCATOR[], Array{T}, dims)
-    return AllocArray(inner)::AllocArray
+    return alloc_similar(CURRENT_ALLOCATOR[], AllocArray{T,N,Arr}, dims)
 end
 
 function Base.similar(a::AllocArray, ::Type{T}, dims::Dims) where {T}
-    inner = alloc_similar(CURRENT_ALLOCATOR[], getfield(a, :arr), T, dims)
-    return AllocArray(inner)::AllocArray
+    return alloc_similar(CURRENT_ALLOCATOR[], a, T, dims)
 end
 
 #####
@@ -68,7 +62,7 @@ end
 
 function Base.similar(bc::Broadcasted{ArrayStyle{AllocArray{T,N,Arr}}},
                       ::Type{ElType}) where {T,N,Arr,ElType}
-    return similar(AllocArray{T,N,Arr}, axes(bc))::AllocArray
+    return similar(AllocArray{T,N,Arr}, axes(bc))
 end
 
 #####

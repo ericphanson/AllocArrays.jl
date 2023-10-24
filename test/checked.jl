@@ -35,3 +35,38 @@ end
     @test_throws Any y[1]
 
 end
+
+
+function bad_function_1(a)
+    buf = AllocBuffer(2^23) # 8 MiB
+    output = []
+    with_locked_bumper(buf) do
+        @no_escape buf begin
+            result = some_allocating_function(a)
+            push!(output, result.b) # wrong! `b` is escaping `@no_escape`!
+        end
+    end
+    return sum(output...)
+end
+
+@testset begin
+    bad_function_1(CheckedAllocArray([1]))
+
+end
+
+function bad_function_2(a)
+    buf = AllocBuffer(2^23) # 8 MiB
+    output = Channel(Inf)
+    with_locked_bumper(buf) do
+        @sync for _ = 1:10
+            Threads.@spawn begin
+                @no_escape buf begin
+                    scalar = basic_reduction(a)
+                    put!(output, scalar)
+                end # wrong! we cannot reset here as `buf` is being used on other tasks
+            end
+        end
+    end
+    close(output)
+    return sum(collect(output))
+end

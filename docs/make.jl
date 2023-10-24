@@ -13,6 +13,7 @@ makedocs(;
                                 edit_link="main",
                                 assets=String[]),
          pages=["Home" => "index.md",
+                "Examples" => "examples.md",
                 "Allocator interface" => "interface.md"])
 
 deploydocs(; repo="github.com/ericphanson/AllocArrays.jl.git",

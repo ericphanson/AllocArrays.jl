@@ -14,3 +14,8 @@ AllocArray
 with_locked_bumper
 AllocArrays.unsafe_with_bumper
 ```
+
+```@docs
+CheckedAllocArray
+with_checked_bumper_no_escape
+```
