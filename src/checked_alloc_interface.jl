@@ -48,17 +48,6 @@ function alloc_similar(B::BumperAllocator, ::Type{CheckedAllocArray{T,N,Arr}},
     end
 end
 
-function reset!(B::OnlyLockedBumperAllocator)
-    @lock B begin
-        reset!(B.bumper)
-    end
-    return nothing
-end
-
-function reset!(B::UncheckedBumperAllocator)
-    Bumper.reset_buffer!(B.buf)
-    return nothing
-end
 
 function reset!(B::BumperAllocator)
     @lock B begin
@@ -93,14 +82,4 @@ bumper(b::AllocBuffer) = BumperAllocator(b)
 
 function with_allocator(f, b)
     return with(f, CURRENT_ALLOCATOR => b)
-end
-
-
-function alloc_similar(::DefaultAllocator, ::CheckedAllocArray, ::Type{T}, dims::Dims) where {T}
-    return similar(Array{T}, dims)
-end
-
-function alloc_similar(::DefaultAllocator, ::Type{CheckedAllocArray{T,N,Arr}},
-                       dims::Dims) where {T, N, Arr}
-    return similar(Arr, dims)
 end

@@ -31,6 +31,14 @@ function alloc_similar(::DefaultAllocator, ::Type{AllocArray{T,N,Arr}},
     return similar(Arr, dims)
 end
 
+function alloc_similar(::DefaultAllocator, ::CheckedAllocArray, ::Type{T}, dims::Dims) where {T}
+    return similar(Array{T}, dims)
+end
+
+function alloc_similar(::DefaultAllocator, ::Type{CheckedAllocArray{T,N,Arr}},
+                       dims::Dims) where {T, N, Arr}
+    return similar(Arr, dims)
+end
 
 #####
 ##### Bumper.jl
@@ -38,21 +46,9 @@ end
 
 # Could be moved to a package extension?
 
-struct UncheckedBumperAllocator{B<:AllocBuffer} <: Allocator
-    buf::B
-end
-
-function alloc_similar(B::UncheckedBumperAllocator, ::AllocArray, ::Type{T}, dims::Dims) where {T}
-    inner = Bumper.alloc(T, B.buf, dims...)
-    return AllocArray(inner)
-end
-
-function alloc_similar(B::UncheckedBumperAllocator, ::Type{AllocArray{T,N,Arr}}, dims::Dims) where {T, N, Arr}
-    inner = Bumper.alloc(T, B.buf, dims...)
-    return AllocArray(inner)
-end
 
 """
+    TODO-fixme
     unsafe_with_bumper(f, buf::AllocBuffer)
 
 Runs `f()` in the context of using a `UncheckedBumperAllocator{typeof(buf)}` to
@@ -87,38 +83,36 @@ end
 12
 ```
 """
-function unsafe_with_bumper(f, buf::AllocBuffer)
-    return with(f, CURRENT_ALLOCATOR => UncheckedBumperAllocator(buf))
+struct UncheckedBumperAllocator{B<:AllocBuffer} <: Allocator
+    buf::B
+end
+
+function reset!(B::UncheckedBumperAllocator)
+    Bumper.reset_buffer!(B.buf)
+    return nothing
+end
+
+function alloc_similar(B::UncheckedBumperAllocator, ::AllocArray, ::Type{T}, dims::Dims) where {T}
+    inner = Bumper.alloc(T, B.buf, dims...)
+    return AllocArray(inner)
+end
+
+function alloc_similar(B::UncheckedBumperAllocator, ::Type{AllocArray{T,N,Arr}}, dims::Dims) where {T, N, Arr}
+    inner = Bumper.alloc(T, B.buf, dims...)
+    return AllocArray(inner)
 end
 
 #####
 ##### OnlyLockedBumperAllocator
 #####
 
+# Is this useful? It only saves an extra empty `Vector{MemValid}` over `BumperAllocator`...
+
 # An alternative route to thread safety: just lock the allocator before using it.
 # This helps with short-lived tasks (which shouldn't each get their own buffer)
 
-struct OnlyLockedBumperAllocator{A} <: Allocator
-    bumper::A
-    lock::ReentrantLock
-end
-
-function OnlyLockedBumperAllocator(buf::AllocBuffer)
-    return OnlyLockedBumperAllocator(UncheckedBumperAllocator(buf), ReentrantLock())
-end
-
-function OnlyLockedBumperAllocator(b)
-    return OnlyLockedBumperAllocator(b, ReentrantLock())
-end
-Base.lock(f::Function, B::OnlyLockedBumperAllocator) = lock(f, B.lock)
-Base.lock(B::OnlyLockedBumperAllocator) = lock(B.lock)
-Base.unlock(B::OnlyLockedBumperAllocator) = unlock(B.lock)
-
-function alloc_similar(B::OnlyLockedBumperAllocator, args...)
-    return @lock(B, alloc_similar(B.bumper, args...))
-end
-
 """
+    TODO-fixme
     with_locked_bumper(f, buf::AllocBuffer)
 
 Runs `f()` in the context of using a `OnlyLockedBumperAllocator` to
@@ -155,6 +149,29 @@ sum(collect(c))
 225
 ```
 """
-function with_locked_bumper(f, buf::AllocBuffer)
-    return with(f, CURRENT_ALLOCATOR => OnlyLockedBumperAllocator(buf))
+struct OnlyLockedBumperAllocator{A} <: Allocator
+    bumper::A
+    lock::ReentrantLock
+end
+
+function OnlyLockedBumperAllocator(buf::AllocBuffer)
+    return OnlyLockedBumperAllocator(UncheckedBumperAllocator(buf), ReentrantLock())
+end
+
+function OnlyLockedBumperAllocator(b)
+    return OnlyLockedBumperAllocator(b, ReentrantLock())
+end
+Base.lock(f::Function, B::OnlyLockedBumperAllocator) = lock(f, B.lock)
+Base.lock(B::OnlyLockedBumperAllocator) = lock(B.lock)
+Base.unlock(B::OnlyLockedBumperAllocator) = unlock(B.lock)
+
+function reset!(B::OnlyLockedBumperAllocator)
+    @lock B begin
+        reset!(B.bumper)
+    end
+    return nothing
+end
+
+function alloc_similar(B::OnlyLockedBumperAllocator, args...)
+    return @lock(B, alloc_similar(B.bumper, args...))
 end

@@ -19,9 +19,9 @@ export DefaultAllocator
 export bumper, BumperAllocator, OnlyLockedBumperAllocator, UncheckedBumperAllocator, reset!
 
 include("AllocArray.jl")
-include("alloc_interface.jl")
-
 include("CheckedAllocArray.jl")
+
+include("alloc_interface.jl")
 include("checked_alloc_interface.jl")
 
 const CURRENT_ALLOCATOR = ScopedValue{Allocator}(DEFAULT_ALLOCATOR)
