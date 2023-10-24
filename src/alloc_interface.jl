@@ -92,36 +92,36 @@ function unsafe_with_bumper(f, buf::AllocBuffer)
 end
 
 #####
-##### LockedBumperAllocator
+##### OnlyLockedBumperAllocator
 #####
 
 # An alternative route to thread safety: just lock the allocator before using it.
 # This helps with short-lived tasks (which shouldn't each get their own buffer)
 
-struct LockedBumperAllocator{A} <: Allocator
+struct OnlyLockedBumperAllocator{A} <: Allocator
     bumper::A
     lock::ReentrantLock
 end
 
-function LockedBumperAllocator(buf::AllocBuffer)
-    return LockedBumperAllocator(UncheckedBumperAllocator(buf), ReentrantLock())
+function OnlyLockedBumperAllocator(buf::AllocBuffer)
+    return OnlyLockedBumperAllocator(UncheckedBumperAllocator(buf), ReentrantLock())
 end
 
-function LockedBumperAllocator(b)
-    return LockedBumperAllocator(b, ReentrantLock())
+function OnlyLockedBumperAllocator(b)
+    return OnlyLockedBumperAllocator(b, ReentrantLock())
 end
-Base.lock(f::Function, B::LockedBumperAllocator) = lock(f, B.lock)
-Base.lock(B::LockedBumperAllocator) = lock(B.lock)
-Base.unlock(B::LockedBumperAllocator) = unlock(B.lock)
+Base.lock(f::Function, B::OnlyLockedBumperAllocator) = lock(f, B.lock)
+Base.lock(B::OnlyLockedBumperAllocator) = lock(B.lock)
+Base.unlock(B::OnlyLockedBumperAllocator) = unlock(B.lock)
 
-function alloc_similar(B::LockedBumperAllocator, args...)
+function alloc_similar(B::OnlyLockedBumperAllocator, args...)
     return @lock(B, alloc_similar(B.bumper, args...))
 end
 
 """
     with_locked_bumper(f, buf::AllocBuffer)
 
-Runs `f()` in the context of using a `LockedBumperAllocator` to
+Runs `f()` in the context of using a `OnlyLockedBumperAllocator` to
 allocate memory to `similar` calls on [`AllocArray`](@ref)s.
 
 All such allocations should occur within an `@no_escape` block,
@@ -156,5 +156,5 @@ sum(collect(c))
 ```
 """
 function with_locked_bumper(f, buf::AllocBuffer)
-    return with(f, CURRENT_ALLOCATOR => LockedBumperAllocator(buf))
+    return with(f, CURRENT_ALLOCATOR => OnlyLockedBumperAllocator(buf))
 end
