@@ -2,9 +2,8 @@
 # This should wrap a `UncheckedBumperAllocator`
 # Then if get an `AllocArray`, we just forward to that and don't do any checking
 # If we get a `CheckedAllocArray`, we go through the checking route
-# Then there are 3 options:
+# Then there are 2 options:
 # - UncheckedBumperAllocator: no protection
-# - OnlyLockedBumperAllocator: wraps UncheckedBumperAllocator, adds concurrency protection
 # - BumperAllocator: wraps UncheckedBumperAllocator, adds both concurrency and memory safety
 # ...
 # this interface means the central object the user creates is these allocator types
@@ -67,7 +66,6 @@ end
 # If we have a `BumperAllocator` and are asked to allocate an unchecked array
 # then we can do that by dispatching to the inner bumper. We will still
 # get the lock for concurrency-safety.
-# I.e. we are acting just like a `OnlyLockedBumperAllocator` in this case.
 function alloc_similar(B::BumperAllocator, ::Type{AllocArray{T,N,Arr}},
                        dims::Dims) where {T,N,Arr}
     return @lock(B, alloc_similar(B.bumper, AllocArray{T,N,Arr}, dims))
