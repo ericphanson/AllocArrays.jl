@@ -1,9 +1,11 @@
 
 function checked_bumper_run(model, data)
-    buf = AllocBuffer(2^25) # 32 MiB
+    buf = BumperAllocator(2^25) # 32 MiB
     # should be safe here because we don't allocate concurrently
-    with_checked_bumper_no_escape(buf) do
-        sum(model, data)
+    with_allocator(buf) do
+        result = sum(model, data)
+        reset!(buf)
+        return result
     end
 end
 
@@ -12,23 +14,23 @@ end
 
     data = [[x] for x in -2:0.001f0:2]
 
-    alloc_data = CheckedAllocArray.(data)
+    checked_alloc_data = CheckedAllocArray.(data)
 
-    @test sum(model, data) ≈ checked_bumper_run(model, alloc_data) atol = 1e-3
-    # @test sum(model, data) ≈ sum(model, alloc_data) atol = 1e-3
+    @test sum(model, data) ≈ checked_bumper_run(model, checked_alloc_data) atol = 1e-3
+    @test sum(model, data) ≈ sum(model, checked_alloc_data) atol = 1e-3
 
     # # Show some timing info
-    # @showtime sum(model, data)
-    # @showtime sum(model, alloc_data)
-    # @showtime checked_bumper_run(model, alloc_data)
+    @showtime checked_bumper_run(model, checked_alloc_data)
 end
 
 @testset "escape" begin
     input = CheckedAllocArray([1.0])
-    buf = AllocBuffer(2^25) # 32 MiB
-    y = with_checked_bumper_no_escape(buf) do
+    buf = BumperAllocator(2^25) # 32 MiB
+    y = with_allocator(buf) do
         y = similar(input)
         y .= 2
+        reset!(buf)
+        return y
     end
 
     # TODO- exception type
@@ -38,35 +40,36 @@ end
 
 
 function bad_function_1(a)
-    buf = AllocBuffer(2^23) # 8 MiB
+    buf = BumperAllocator(2^23) # 8 MiB
     output = []
-    with_locked_bumper(buf) do
-        @no_escape buf begin
-            result = some_allocating_function(a)
-            push!(output, result.b) # wrong! `b` is escaping `@no_escape`!
-        end
+    with_allocator(buf) do
+        result = some_allocating_function(a)
+        push!(output, result.b) # wrong! `b` is escaping `reset`!
+        reset!(buf)
     end
     return sum(output...)
 end
 
-@testset begin
-    bad_function_1(CheckedAllocArray([1]))
-
-end
-
 function bad_function_2(a)
-    buf = AllocBuffer(2^23) # 8 MiB
+    b = BumperAllocator(2^25)
     output = Channel(Inf)
-    with_locked_bumper(buf) do
+    with_allocator(b) do
         @sync for _ = 1:10
             Threads.@spawn begin
-                @no_escape buf begin
-                    scalar = basic_reduction(a)
-                    put!(output, scalar)
-                end # wrong! we cannot reset here as `buf` is being used on other tasks
+                scalar = basic_reduction(a)
+                put!(output, scalar)
+                reset!(b) # wrong! we cannot reset here as `b` is being used on other tasks
             end
         end
     end
     close(output)
     return sum(collect(output))
+end
+
+@testset begin
+    @test_throws InvalidMemoryException bad_function_1(CheckedAllocArray([1]))
+
+    # This is not guaranteed to throw:
+    # @test_throws InvalidMemoryException bad_function_2(CheckedAllocArray([1]))
+
 end

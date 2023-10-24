@@ -13,7 +13,7 @@ where the latter is used by broadcasting.
 abstract type Allocator end
 
 #####
-##### Default allocator
+##### DefaultAllocator
 #####
 
 # Just dispatches to `similar`
@@ -23,29 +23,28 @@ struct DefaultAllocator <: Allocator end
 const DEFAULT_ALLOCATOR = DefaultAllocator()
 
 function alloc_similar(::DefaultAllocator, ::AllocArray, ::Type{T}, dims::Dims) where {T}
-    return similar(Array{T}, dims)
+    return AllocArray(similar(Array{T}, dims))
 end
 
 function alloc_similar(::DefaultAllocator, ::Type{AllocArray{T,N,Arr}},
                        dims::Dims) where {T, N, Arr}
-    return similar(Arr, dims)
+    return AllocArray(similar(Arr, dims))
 end
 
 function alloc_similar(::DefaultAllocator, ::CheckedAllocArray, ::Type{T}, dims::Dims) where {T}
-    return similar(Array{T}, dims)
+    return CheckedAllocArray(similar(Array{T}, dims))
 end
 
 function alloc_similar(::DefaultAllocator, ::Type{CheckedAllocArray{T,N,Arr}},
                        dims::Dims) where {T, N, Arr}
-    return similar(Arr, dims)
+    return CheckedAllocArray(similar(Arr, dims))
 end
 
 #####
-##### Bumper.jl
+##### UncheckedBumperAllocator
 #####
 
-# Could be moved to a package extension?
-
+# Naive use of Bumper.jl
 
 """
     TODO-fixme
@@ -87,6 +86,9 @@ struct UncheckedBumperAllocator{B<:AllocBuffer} <: Allocator
     buf::B
 end
 
+UncheckedBumperAllocator(n::Int) = UncheckedBumperAllocator(AllocBuffer(n))
+
+
 function reset!(B::UncheckedBumperAllocator)
     Bumper.reset_buffer!(B.buf)
     return nothing
@@ -102,17 +104,20 @@ function alloc_similar(B::UncheckedBumperAllocator, ::Type{AllocArray{T,N,Arr}},
     return AllocArray(inner)
 end
 
-# TODO-
-# This should wrap a `UncheckedBumperAllocator`
-# Then if get an `AllocArray`, we just forward to that and don't do any checking
-# If we get a `CheckedAllocArray`, we go through the checking route
-# Then there are 2 options:
-# - UncheckedBumperAllocator: no protection
-# - BumperAllocator: wraps UncheckedBumperAllocator, adds both concurrency and memory safety
-# ...
-# this interface means the central object the user creates is these allocator types
-# then they call our `reset!`. Not `@no_escape`.
-# Should we have a `try/finally` interface?
+#####
+##### BumperAllocator
+#####
+
+# Has safety checks
+# - concurrecy safety: protects access to buffer with a lock
+#   - this does not protect against `reset!` being called while a task is using the buffer!
+#   - but this allow allocations to occur on multiple tasks
+# - memory safety, when opted into with `CheckedAllocArray`
+#   - when `CheckedAllocArray` is used, we keep a reference to the `MemValid` associated to that array
+#   - on `reset!` we invalidate that object (using a write-lock)
+#   - every access to a `CheckedAllocArray` uses a read-lock to `MemValid` to ensure the memory is still valid
+
+# TODO-docstring
 struct BumperAllocator{B} <: Allocator
     bumper::B
     mems::Vector{MemValid}
@@ -129,6 +134,8 @@ BumperAllocator(n::Int) = BumperAllocator(AllocBuffer(n))
 
 Base.lock(B::BumperAllocator) = lock(B.lock)
 Base.unlock(B::BumperAllocator) = unlock(B.lock)
+
+# `CheckedAllocArray`
 
 function alloc_similar(B::BumperAllocator, c::CheckedAllocArray, ::Type{T},
                        dims::Dims) where {T}
@@ -152,6 +159,8 @@ function alloc_similar(B::BumperAllocator, ::Type{CheckedAllocArray{T,N,Arr}},
         return CheckedAllocArray(inner, valid)
     end
 end
+
+# `AllocArray`
 
 # If we have a `BumperAllocator` and are asked to allocate an unchecked array
 # then we can do that by dispatching to the inner bumper. We will still

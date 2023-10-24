@@ -33,13 +33,12 @@ arr = ones(Float64, 100_000)
 @time basic_reduction(a) #  0.129436 seconds (181.10 k allocations: 14.228 MiB, 99.11% compilation time)
 @time basic_reduction(a) #  0.000494 seconds (21 allocations: 2.289 MiB)
 
-
 function bumper_reduction(a)
-    buf = AllocBuffer()
-    with_locked_bumper(buf) do
-        @no_escape buf begin
-            basic_reduction(a)
-        end
+    buf = BumperAllocator(2^24) # 16 MiB
+    with_allocator(buf) do
+        ret = basic_reduction(a)
+        reset!(buf)
+        return ret
     end
 end
 
@@ -71,18 +70,18 @@ We can see in this example, we got ~100x less allocation, and similar runtime.
 This package does not create any Bumper.jl buffers, does not use any implicit ones, and does not reset any buffer that is handed to it. These choices are deliberate: the caller must create the buffer, pass it to AllocArrays.jl as desired, and reset it when they are done.
 
 In particular, the caller must:
-- ...not reset a buffer in active use. E.g., do not call `@no_escape` on a buffer that may be used by another task
+- ...not reset a buffer in active use. E.g., do not call `reset!` on a buffer that may be used by another task
 - ...not allow memory allocated with a buffer to be live after the underlying buffer has been reset
 - ...reset their buffers before it runs out of memory
 
 ## Safety
 
-Before using a bump allocator (`unsafe_with_bumper`, or `with_locked_bumper`) it is recommended the user read the [Bumper.jl README](https://github.com/MasonProtter/Bumper.jl#bumperjl) to understand how it works and what the limitations are.
+Before using a bump allocator (`BumperAllocator`, or `UncheckedBumperAllocator`) it is recommended the user read the [Bumper.jl README](https://github.com/MasonProtter/Bumper.jl#bumperjl) to understand how it works and what the limitations are.
 
 Note also:
 
-- Just as with all usage of Bumper.jl, the user is responsible for only using Bumper's `@no_escape` when newly allocated arrays truly will not escape
-  - with AllocArrays this can be slightly more subtle, because within `unsafe_with_bumper` or `with_locked_bumper` block, `similar` calls on `AllocArray`s will allocate using the bump allocator. Thus, one must be sure that none of those allocations leak past a `@no_escape` block. The simplest way to do so is to be sure no allocations of any kind escape from a `@no_escape` block. You can pass in pre-allocated memory and fill that.
-- Calling `unsafe_with_bumper(f, buf)` is not safe if allocations may occur concurrently. Since you may not know all the `similar` calls present in the code, this is a-priori dangerous to use.
-- Calling `with_locked_bumper(f, buf)` provides a safe alternative simply by using a lock to control access to `buf`. In this way, the single buffer `buf` will be used to allocate for all `similar` calls (even across threads/tasks).
-    - However, `@no_escape` must be called outside of the threaded region, since deallocation in the bump allocator (via `@no_escape`) on one task will interfere with allocations on others.
+- Just as with all usage of Bumper.jl, the user is responsible for only using `reset!` when newly allocated arrays truly will not escape
+  - with AllocArrays this can be slightly more subtle, because within a `with_allocator` with a bump allocator  block, `similar` calls on `AllocArray` or `CheckedAllocArray`s will allocate using the bump allocator. Thus, one must be sure that none of those allocations leak past a `reset!`. The simplest way to do so is to be sure no allocations of any kind escape from a `reset!` block. You can pass in pre-allocated memory and fill that.
+- Using an `UncheckedBumpAllocator` is not safe if allocations may occur concurrently. Since you may not know all the `similar` calls present in the code, this is a-priori dangerous to use.
+- Using `BumpAllocator` provides a semi-safe alternative simply by using a lock to control access to `buf`. In this way, the single buffer `buf` will be used to allocate for all `similar` calls (even across threads/tasks).
+    - However, `reset!` must be called outside of the threaded region, since deallocation in the bump allocator (via `reset!`) on one task will interfere with allocations on others.
