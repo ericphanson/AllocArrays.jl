@@ -26,20 +26,12 @@ jobs:
         arch:
           - x64
           - x86
-        bumper:
-          - '0.3'
-          - '0.4'
     steps:
       - uses: actions/checkout@v3
       - uses: julia-actions/setup-julia@v1
         with:
           version: ${{ matrix.version }}
           arch: ${{ matrix.arch }}
-      - name: "Install Bumper.jl"
-        shell: julia --color=yes --project=. {0}
-        run: |
-            using Pkg
-            Pkg.add(PackageSpec(; name="Bumper", version=v"${{ matrix.bumper }}"))
       - uses: julia-actions/cache@v1
       - uses: julia-actions/julia-buildpkg@v1
       - uses: julia-actions/julia-runtest@v1
