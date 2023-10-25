@@ -2,7 +2,6 @@ module AllocArrays
 
 using ScopedValues: ScopedValue, with
 using Bumper
-using Adapt
 using ConcurrentUtilities
 
 # Two array types

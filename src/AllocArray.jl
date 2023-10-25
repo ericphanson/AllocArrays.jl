@@ -69,7 +69,7 @@ end
 ##### Adapt.jl
 #####
 
-Adapt.adapt_structure(to, x::AllocArray) = AllocArray(adapt(to, parent(x)))
+# Adapt.adapt_structure(to, x::AllocArray) = AllocArray(adapt(to, parent(x)))
 
 #####
 ##### StridedArray interface

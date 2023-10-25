@@ -18,10 +18,9 @@ end
 """
     CheckedAllocArray(arr::AbstractArray)
 
-Wrapper type which forwards most array methods to the inner array,
-but dispatches `similar` to special allocation methods.
+"Slow but safe" version of [`AllocArray`](@ref).
 
-Keeps track of whether or not its memory is valid with `valid`.
+Keeps track of whether or not its memory is valid.
 All accesses to the array first check if the memory is still valid,
 and throw an `InvalidMemoryException` if not.
 
@@ -53,7 +52,8 @@ function CheckedAllocArray(::AllocArray)
                         """))
 end
 
-# idempotent I guess
+# idempotent I guess. Note we need to have a method since falling back to
+# `CheckedAllocArray(arr::AbstractArray)` is wrong as that assumes valid memory.
 CheckedAllocArray(c::CheckedAllocArray) = c
 
 struct InvalidMemoryException <: Base.Exception end
@@ -70,13 +70,21 @@ function _get_inner(a::CheckedAllocArray)
     return a.alloc_array
 end
 
+# Not sure we want to expose this but for benchmarking
+# we can turn off the lock, which speeds things up quite a bit.
+const CHECKED_ALLOC_ARRAYS_USE_LOCK = Ref(true)
+
 # Read lock
-Base.lock(c::CheckedAllocArray) = readlock(c.valid.lock)
-Base.unlock(c::CheckedAllocArray) = readunlock(c.valid.lock)
+Base.lock(c::CheckedAllocArray) = CHECKED_ALLOC_ARRAYS_USE_LOCK[] ? readlock(c.valid.lock) : nothing
+Base.unlock(c::CheckedAllocArray) = CHECKED_ALLOC_ARRAYS_USE_LOCK[] ? readunlock(c.valid.lock) : nothing
 
 function invalidate!(valid::MemValid)
-    # Writer lock
-    @lock valid.lock begin
+    if CHECKED_ALLOC_ARRAYS_USE_LOCK[]
+        # Writer lock
+        @lock valid.lock begin
+            valid.valid = false
+        end
+    else
         valid.valid = false
     end
     return nothing
@@ -138,10 +146,10 @@ end
 ##### Adapt.jl
 #####
 
-function Adapt.adapt_structure(to, a::CheckedAllocArray)
-    inner = @lock(a, Adapt.adapt_structure(to, _get_inner(a)))
-    return CheckedAllocArray(inner, a.valid)
-end
+# function Adapt.adapt_structure(to, a::CheckedAllocArray)
+#     inner = @lock(a, Adapt.adapt_structure(to, _get_inner(a)))
+#     return CheckedAllocArray(inner, a.valid)
+# end
 
 #####
 ##### StridedArray interface

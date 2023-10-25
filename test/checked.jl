@@ -61,10 +61,21 @@ function bad_function_2(a)
     return sum(collect(output))
 end
 
-@testset begin
+@testset "Bad functions" begin
     @test_throws InvalidMemoryException bad_function_1(CheckedAllocArray([1]))
 
     # This is not guaranteed to throw:
     # @test_throws InvalidMemoryException bad_function_2(CheckedAllocArray([1]))
 
+end
+
+@testset "Misc" begin
+    @test_throws ArgumentError CheckedAllocArray(AllocArray([1]))
+    inner = [1]
+    c = CheckedAllocArray(inner)
+    @test CheckedAllocArray(c) === c
+
+    @test sprint(showerror, InvalidMemoryException()) == "InvalidMemoryException: Array accessed after its memory has been deallocated."
+
+    @test Base.parent(c) === inner
 end
