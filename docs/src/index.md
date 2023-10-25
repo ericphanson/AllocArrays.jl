@@ -29,3 +29,7 @@ We also provide an unsafe option.
 ```@docs
 UncheckedBumperAllocator
 ```
+
+```@docs
+AllocArrays.DefaultAllocator
+```

@@ -23,21 +23,17 @@ end
     @showtime checked_bumper_run(model, checked_alloc_data)
 end
 
-@testset "escape" begin
+@testset "basic escape" begin
     input = CheckedAllocArray([1.0])
-    buf = BumperAllocator(2^25) # 32 MiB
+    buf = BumperAllocator(2^23) # 8 MiB
     y = with_allocator(buf) do
         y = similar(input)
         y .= 2
         reset!(buf)
         return y
     end
-
-    # TODO- exception type
-    @test_throws Any y[1]
-
+    @test_throws InvalidMemoryException y[1]
 end
-
 
 function bad_function_1(a)
     buf = BumperAllocator(2^23) # 8 MiB
@@ -51,7 +47,7 @@ function bad_function_1(a)
 end
 
 function bad_function_2(a)
-    b = BumperAllocator(2^25)
+    b = BumperAllocator(2^23) # 8 MiB
     output = Channel(Inf)
     with_allocator(b) do
         @sync for _ = 1:10

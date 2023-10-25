@@ -18,6 +18,18 @@ abstract type Allocator end
 
 # Just dispatches to `similar`
 
+"""
+    DefaultAllocator()
+
+Represents the default Julia allocator.
+
+Used to dispatch `similar` calls
+for [`AllocArray`](@ref)s and [`CheckedAllocArray`](@ref)s
+to allocate using the the default Julia allocator.
+
+This allocator is used by default if another one is not
+used via [`with_allocator`](@ref).
+"""
 struct DefaultAllocator <: Allocator end
 
 const DEFAULT_ALLOCATOR = DefaultAllocator()
@@ -50,7 +62,9 @@ end
     UncheckedBumperAllocator(b::AllocBuffer)
 
 Use with [`with_allocator`](@ref) to dispatch `similar` calls
-for [`AllocArray`](@ref)s to allocate using the buffer `b`.
+for [`AllocArray`](@ref)s to allocate using the buffer `b`,
+an `AllocBuffer` provided by Bumper.jl.
+
 Does not support [`CheckedAllocArray`](@ref).
 
 This provides a naive & direct interface to allocating on the buffer
@@ -65,15 +79,15 @@ See also: [`BumperAllocator`](@ref).
 
 ## Example
 
-```julia
-using AllocArrays
+```jldoctest
+using AllocArrays, Bumper
 
 input = AllocArray([1,2,3])
-buf = UncheckedBumperAllocator(2^24)
-with_allocator(buf) do
+b = UncheckedBumperAllocator(AllocBuffer(2^24)) # 16 MiB
+with_allocator(b) do
     # ...code with must not allocate AllocArrays on multiple tasks via `similar` nor escape or return newly-allocated AllocArrays...
     ret = sum(input .* 2)
-    reset!(buf)
+    reset!(b)
     return ret
 end
 
@@ -88,10 +102,22 @@ end
 """
     UncheckedBumperAllocator(n_bytes::Int)
 
-Shorthand for `UncheckedBumperAllocator(AllocBuffer(n))`.
+Shorthand for `UncheckedBumperAllocator(AllocBuffer(n_bytes))`.
 """
-UncheckedBumperAllocator(n::Int) = UncheckedBumperAllocator(AllocBuffer(n))
+UncheckedBumperAllocator(n_bytes::Int) = UncheckedBumperAllocator(AllocBuffer(n_bytes))
 
+"""
+    reset!(B::UncheckedBumperAllocator)
+
+Resets the `UncheckedBumperAllocator`, deallocating all of the arrays
+created by it.
+
+This must only be used if those arrays will not be accessed again.
+
+It is not safe to deallocate on one task while using the allocator
+to allocate on another task. Therefore this should only be called outside
+of threaded regions of code.
+"""
 function reset!(B::UncheckedBumperAllocator)
     Bumper.reset_buffer!(B.buf)
     return nothing
@@ -120,14 +146,13 @@ end
 #   - on `reset!` we invalidate that object (using a write-lock)
 #   - every access to a `CheckedAllocArray` uses a read-lock to `MemValid` to ensure the memory is still valid
 
-# TODO-docstring
-
 """
     BumperAllocator(b::AllocBuffer)
 
 Use with [`with_allocator`](@ref) to dispatch `similar` calls
 for [`AllocArray`](@ref)s and [`CheckedAllocArray`](@ref)s
-to allocate using the buffer `b`.
+to allocate using the buffer `b`, an `AllocBuffer` provided by
+Bumper.jl.
 
 Uses a lock to serialize allocations to the buffer `b`,
 which should allow safe concurrent usage.
@@ -141,9 +166,9 @@ See also: [`UncheckedBumperAllocator`](@ref).
 ## Example
 
 ```jldoctest
-using AllocArrays
+using AllocArrays, Bumper
 
-b = BumperAllocator(2^24) # 16 MiB
+b = BumperAllocator(AllocBuffer(2^24)) # 16 MiB
 input = AllocArray([1,2,3])
 c = Channel(Inf)
 with_allocator(b) do
@@ -172,7 +197,12 @@ function BumperAllocator(B::AllocBuffer)
     return BumperAllocator(UncheckedBumperAllocator(B), MemValid[], ReentrantLock())
 end
 
-BumperAllocator(n::Int) = BumperAllocator(AllocBuffer(n))
+"""
+    BumperAllocator(n_bytes::Int)
+
+Shorthand for `BumperAllocator(AllocBuffer(n_bytes))`.
+"""
+BumperAllocator(n_bytes::Int) = BumperAllocator(AllocBuffer(n_bytes))
 
 Base.lock(B::BumperAllocator) = lock(B.lock)
 Base.unlock(B::BumperAllocator) = unlock(B.lock)
@@ -217,6 +247,22 @@ function alloc_similar(B::BumperAllocator, a::AllocArray, ::Type{T},
     return @lock(B, alloc_similar(B.bumper, a, T, dims))
 end
 
+"""
+    reset!(b::BumperAllocator)
+
+Resets the `BumperAllocator`, deallocating all of the arrays
+created by it.
+
+This must only be used if those arrays will not be accessed again.
+However, [`CheckedAllocArray`](@ref)s allocated by this allocator will be marked
+invalid, causing future accesses to them to error, as a safety feature.
+[`AllocArray`](@ref)s have no such safety feature, and access to them
+after `reset!` is unsafe.
+
+It is also not safe to deallocate on one task while using the allocator
+to allocate on another task. Therefore this should only be called outside
+of threaded regions of code.
+"""
 function reset!(B::BumperAllocator)
     @lock B begin
         # Invalidate all memory first
