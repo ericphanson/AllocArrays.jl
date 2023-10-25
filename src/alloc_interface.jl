@@ -3,7 +3,7 @@
 """
     abstract type Allocator end
 
-Alloactors need to subtype `Alloactor` and implement two methods of `alloc_similar`:
+Allocators need to subtype `Allocator` and implement two methods of `alloc_similar`:
 
 - `AllocArrays.alloc_similar(::Allocator, arr, ::Type{T}, dims::Dims)`
 - `AllocArrays.alloc_similar(::Allocator, ::Type{Arr}, dims::Dims) where {Arr<:AbstractArray}`
