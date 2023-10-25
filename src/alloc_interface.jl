@@ -47,35 +47,34 @@ end
 # Naive use of Bumper.jl
 
 """
-    TODO-fixme
-    unsafe_with_bumper(f, buf::AllocBuffer)
+    UncheckedBumperAllocator(b::AllocBuffer)
 
-Runs `f()` in the context of using a `UncheckedBumperAllocator{typeof(buf)}` to
-allocate memory to `similar` calls on [`AllocArray`](@ref)s.
+Use with [`with_allocator`](@ref) to dispatch `similar` calls
+for [`AllocArray`](@ref)s to allocate using the buffer `b`.
+Does not support [`CheckedAllocArray`](@ref).
 
-All such allocations should occur within an `@no_escape` block,
-and of course, no such allocations should escape that block.
+This provides a naive & direct interface to allocating on the buffer
+with no safety checks or locks.
 
-!!! warning
-    Not thread-safe. `f` must not allocate memory using `similar` calls on `AllocArray`'s
-    across multiple threads or tasks.
+This is unsafe to use if multiple tasks may be allocating simultaneously,
+and using [`BumperAllocator`](@ref) is recommended in general.
 
-Remember: if `f` calls into another package, you might not know if they use concurrency
-or not! It is safer to use [`with_locked_bumper`](@ref) for this reason.
+Used with [`reset!`](@ref) to deallocate.
+
+See also: [`BumperAllocator`](@ref).
 
 ## Example
 
-```
-using AllocArrays, Bumper
-using AllocArrays: unsafe_with_bumper
+```julia
+using AllocArrays
 
 input = AllocArray([1,2,3])
-buf = AllocBuffer()
-unsafe_with_bumper(buf) do
-     @no_escape buf begin
-        # ...code with must not allocate AllocArrays on multiple tasks via `similar` nor escape or return newly-allocated AllocArrays...
-        sum(input .* 2)
-     end
+buf = UncheckedBumperAllocator(2^24)
+with_allocator(buf) do
+    # ...code with must not allocate AllocArrays on multiple tasks via `similar` nor escape or return newly-allocated AllocArrays...
+    ret = sum(input .* 2)
+    reset!(buf)
+    return ret
 end
 
 # output
@@ -86,8 +85,12 @@ struct UncheckedBumperAllocator{B<:AllocBuffer} <: Allocator
     buf::B
 end
 
-UncheckedBumperAllocator(n::Int) = UncheckedBumperAllocator(AllocBuffer(n))
+"""
+    UncheckedBumperAllocator(n_bytes::Int)
 
+Shorthand for `UncheckedBumperAllocator(AllocBuffer(n))`.
+"""
+UncheckedBumperAllocator(n::Int) = UncheckedBumperAllocator(AllocBuffer(n))
 
 function reset!(B::UncheckedBumperAllocator)
     Bumper.reset_buffer!(B.buf)
@@ -118,6 +121,45 @@ end
 #   - every access to a `CheckedAllocArray` uses a read-lock to `MemValid` to ensure the memory is still valid
 
 # TODO-docstring
+
+"""
+    BumperAllocator(b::AllocBuffer)
+
+Use with [`with_allocator`](@ref) to dispatch `similar` calls
+for [`AllocArray`](@ref)s and [`CheckedAllocArray`](@ref)s
+to allocate using the buffer `b`.
+
+Uses a lock to serialize allocations to the buffer `b`,
+which should allow safe concurrent usage.
+
+Used with [`reset!`](@ref) to deallocate. Note it is not safe
+to deallocate while another task may be allocating, except with
+[`CheckedAllocArray`](@ref)s which will error appropriately.
+
+See also: [`UncheckedBumperAllocator`](@ref).
+
+## Example
+
+```jldoctest
+using AllocArrays
+
+b = BumperAllocator(2^24) # 16 MiB
+input = AllocArray([1,2,3])
+c = Channel(Inf)
+with_allocator(b) do
+    # ...code with may be multithreaded but which must not escape or return newly-allocated AllocArrays...
+    @sync for i = 1:10
+        Threads.@spawn put!(c, sum(input .+ i))
+    end
+    reset!(b) # called outside of threaded region
+    close(c)
+end
+sum(collect(c))
+
+# output
+225
+```
+"""
 struct BumperAllocator{B} <: Allocator
     bumper::B
     mems::Vector{MemValid}
@@ -190,6 +232,16 @@ function reset!(B::BumperAllocator)
     return nothing
 end
 
-function with_allocator(f, b)
-    return with(f, CURRENT_ALLOCATOR => b)
+"""
+    with_allocator(f, allocator)
+
+Run `f` within a dynamic scope such that `similar` calls to
+[`AllocArray`](@ref)s and [`CheckedAllocArray`](@ref)s dispatch
+to allocator `allocator`.
+
+Used with allocators [`DefaultAllocator`](@ref), [`BumperAllocator`](@ref),
+and [`UncheckedBumperAllocator`](@ref).
+"""
+function with_allocator(f, allocator)
+    return with(f, CURRENT_ALLOCATOR => allocator)
 end

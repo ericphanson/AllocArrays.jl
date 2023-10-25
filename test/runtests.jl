@@ -1,4 +1,4 @@
-using AllocArrays, Bumper
+using AllocArrays
 using Test, Aqua
 
 function some_allocating_function(a)

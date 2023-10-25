@@ -4,7 +4,7 @@
 In the following, we will use our functions:
 
 ```@repl ex
-using AllocArrays, Bumper
+using AllocArrays
 
 function some_allocating_function(a)
     b = similar(a)

@@ -9,10 +9,23 @@ See also the README at that link for more examples and notes.
 
 ## Public API
 
-```@docs
-AllocArray
-```
+### Array types
 
 ```@docs
+AllocArray
 CheckedAllocArray
+```
+
+### Allocators
+
+```@docs
+BumperAllocator
+with_allocator
+reset!
+```
+
+We also provide an unsafe option.
+
+```@docs
+UncheckedBumperAllocator
 ```
