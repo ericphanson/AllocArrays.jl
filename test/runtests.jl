@@ -1,4 +1,4 @@
-using AllocArrays, Bumper
+using AllocArrays
 using Test, Aqua
 
 function some_allocating_function(a)
@@ -15,11 +15,11 @@ function basic_reduction(a)
 end
 
 function bumper_reduction(a)
-    buf = AllocBuffer(2^24) # 16 MiB
-    with_locked_bumper(buf) do
-        @no_escape buf begin
-            basic_reduction(a)
-        end
+    b = BumperAllocator(2^24) # 16 MiB
+    with_allocator(b) do
+        ret = basic_reduction(a)
+        reset!(b)
+        return ret
     end
 end
 
@@ -38,4 +38,5 @@ end
     @test basic_reduction(a) == 2000.0
 
     include("flux.jl")
+    include("checked.jl")
 end

@@ -1,17 +1,19 @@
 name = "AllocArrays"
 uuid = "5c00bae2-1499-4716-9206-27f63fd08a44"
 authors = ["Eric P. Hanson"]
-version = "1.0.0"
+version = "0.1.0"
 
 [deps]
-Adapt = "79e6a3ab-5dfb-504d-930d-738a2a938a0e"
 Bumper = "8ce10254-0962-460f-a3d8-1f77fea1446e"
+ConcurrentUtilities = "f0e56b4a-5159-44fe-b623-3e5288b988bb"
+PrecompileTools = "aea7be01-6a6a-4083-8856-8a6e6704d82a"
 ScopedValues = "7e506255-f358-4e82-b7e4-beb19740aa63"
 
 [compat]
-Adapt = "3"
 Aqua = "0.7"
-Bumper = "0.3, 0.4"
+Bumper = "0.4"
+ConcurrentUtilities = "2.2.1"
+PrecompileTools = "1.2"
 ScopedValues = "1"
 StrideArraysCore = "0.5.1"
 julia = "1.8"

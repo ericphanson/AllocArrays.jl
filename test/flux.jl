@@ -1,13 +1,12 @@
 using Flux, Random, StrideArraysCore
-using AllocArrays: unsafe_with_bumper
 
 function bumper_run(model, data)
-    buf = AllocBuffer(2^25) # 32 MiB
+    b = UncheckedBumperAllocator(2^25) # 32 MiB
     # should be safe here because we don't allocate concurrently
-    unsafe_with_bumper(buf) do
-        @no_escape buf begin
-            sum(model, data)
-        end
+    with_allocator(b) do
+        result = sum(model, data)
+        reset!(b)
+        return result
     end
 end
 
@@ -82,14 +81,13 @@ end
 (m::DigitsModel)(x) = m.chain(x)
 
 function infer!(predictions, model, data)
-    buf = AllocBuffer(2^26) # 64 MiB
+    b = BumperAllocator(2^26) # 64 MiB
     # Here we use a locked bumper for thread-safety, since NNlib multithreads
     # some of it's functions. However we are sure to only deallocate outside of the threaded region. (All concurrency occurs within the `model` call itself).
-    with_locked_bumper(buf) do
+    with_allocator(b) do
         for (idx, x) in enumerate(data)
-            @no_escape buf begin # reset `buf` after each batch
-                predictions[idx] .= model(x)
-            end
+            predictions[idx] .= model(x)
+            reset!(b) # reset `b` after each batch
         end
     end
     return predictions
@@ -111,6 +109,7 @@ end
     fresh_predictions() = [Matrix{Float32}(undef, n_class, size(x, 4)) for x in data]
 
     alloc_data = AllocArray.(data)
+    checked_alloc_data = CheckedAllocArray.(data)
 
     preds_data = fresh_predictions()
     infer!(preds_data, model, data)
@@ -118,17 +117,22 @@ end
     preds_alloc = fresh_predictions()
     infer!(preds_alloc, model, alloc_data)
 
+    preds_checked_alloc = fresh_predictions()
+    infer!(preds_checked_alloc, model, checked_alloc_data)
+
     preds_stride = fresh_predictions()
     stride_data = StrideArray.(data)
     infer!(preds_stride, model, stride_data)
 
     @test preds_data ≈ preds_alloc
     @test preds_data ≈ preds_stride
+    @test preds_data ≈ preds_checked_alloc
 
     predictions = fresh_predictions()
     @showtime infer!(predictions, model, data)
     @showtime infer!(predictions, model, stride_data)
     @showtime infer!(predictions, model, alloc_data)
+    @showtime infer!(predictions, model, checked_alloc_data)
 
     # Note: for max perf, consider
     # (using Functors)

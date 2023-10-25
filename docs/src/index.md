@@ -9,8 +9,27 @@ See also the README at that link for more examples and notes.
 
 ## Public API
 
+### Array types
+
 ```@docs
 AllocArray
-with_locked_bumper
-AllocArrays.unsafe_with_bumper
+CheckedAllocArray
+```
+
+### Allocators
+
+```@docs
+BumperAllocator
+with_allocator
+reset!
+```
+
+We also provide an unsafe option.
+
+```@docs
+UncheckedBumperAllocator
+```
+
+```@docs
+AllocArrays.DefaultAllocator
 ```

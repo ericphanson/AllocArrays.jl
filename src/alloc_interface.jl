@@ -13,133 +13,172 @@ where the latter is used by broadcasting.
 abstract type Allocator end
 
 #####
-##### Default allocator
+##### DefaultAllocator
 #####
 
 # Just dispatches to `similar`
 
+"""
+    DefaultAllocator()
+
+Represents the default Julia allocator.
+
+Used to dispatch `similar` calls
+for [`AllocArray`](@ref)s and [`CheckedAllocArray`](@ref)s
+to allocate using the the default Julia allocator.
+
+This allocator is used by default if another one is not
+used via [`with_allocator`](@ref).
+"""
 struct DefaultAllocator <: Allocator end
 
 const DEFAULT_ALLOCATOR = DefaultAllocator()
 
-function alloc_similar(::DefaultAllocator, arr, ::Type{T}, dims::Dims) where {T}
-    return similar(arr, T, dims)
+function alloc_similar(::DefaultAllocator, ::AllocArray, ::Type{T}, dims::Dims) where {T}
+    return AllocArray(similar(Array{T}, dims))
 end
 
-function alloc_similar(::DefaultAllocator, ::Type{Arr},
-                       dims::Dims) where {Arr<:AbstractArray}
-    return similar(Arr, dims)
+function alloc_similar(::DefaultAllocator, ::Type{AllocArray{T,N,Arr}},
+                       dims::Dims) where {T, N, Arr}
+    return AllocArray(similar(Arr, dims))
+end
+
+function alloc_similar(::DefaultAllocator, ::CheckedAllocArray, ::Type{T}, dims::Dims) where {T}
+    return CheckedAllocArray(similar(Array{T}, dims))
+end
+
+function alloc_similar(::DefaultAllocator, ::Type{CheckedAllocArray{T,N,Arr}},
+                       dims::Dims) where {T, N, Arr}
+    # We know the memory is valid since it was allocated with the
+    # default allocator
+    return CheckedAllocArray(similar(Arr, dims), MemValid(true))
 end
 
 #####
-##### Bumper.jl
+##### UncheckedBumperAllocator
 #####
 
-# Could be moved to a package extension?
-
-struct BumperAllocator{B<:AllocBuffer} <: Allocator
-    buf::B
-end
-
-function alloc_similar(B::BumperAllocator, arr, ::Type{T}, dims::Dims) where {T}
-    # ignore arr type for now
-    return Bumper.alloc(T, B.buf, dims...)
-end
-
-function alloc_similar(B::BumperAllocator, ::Type{Arr}, dims::Dims) where {Arr}
-    return Bumper.alloc(eltype(Arr), B.buf, dims...)
-end
+# Naive use of Bumper.jl
 
 """
-    unsafe_with_bumper(f, buf::AllocBuffer)
+    UncheckedBumperAllocator(b::AllocBuffer)
 
-Runs `f()` in the context of using a `BumperAllocator{typeof(buf)}` to
-allocate memory to `similar` calls on [`AllocArray`](@ref)s.
+Use with [`with_allocator`](@ref) to dispatch `similar` calls
+for [`AllocArray`](@ref)s to allocate using the buffer `b`,
+an `AllocBuffer` provided by Bumper.jl.
 
-All such allocations should occur within an `@no_escape` block,
-and of course, no such allocations should escape that block.
+Does not support [`CheckedAllocArray`](@ref).
 
-!!! warning
-    Not thread-safe. `f` must not allocate memory using `similar` calls on `AllocArray`'s
-    across multiple threads or tasks.
+This provides a naive & direct interface to allocating on the buffer
+with no safety checks or locks.
 
-Remember: if `f` calls into another package, you might not know if they use concurrency
-or not! It is safer to use [`with_locked_bumper`](@ref) for this reason.
+This is unsafe to use if multiple tasks may be allocating simultaneously,
+and using [`BumperAllocator`](@ref) is recommended in general.
+
+Used with [`reset!`](@ref) to deallocate.
+
+See also: [`BumperAllocator`](@ref).
 
 ## Example
 
 ```jldoctest
 using AllocArrays, Bumper
-using AllocArrays: unsafe_with_bumper
 
 input = AllocArray([1,2,3])
-buf = AllocBuffer()
-unsafe_with_bumper(buf) do
-     @no_escape buf begin
-        # ...code with must not allocate AllocArrays on multiple tasks via `similar` nor escape or return newly-allocated AllocArrays...
-        sum(input .* 2)
-     end
+b = UncheckedBumperAllocator(AllocBuffer(2^24)) # 16 MiB
+with_allocator(b) do
+    # ...code with must not allocate AllocArrays on multiple tasks via `similar` nor escape or return newly-allocated AllocArrays...
+    ret = sum(input .* 2)
+    reset!(b)
+    return ret
 end
 
 # output
 12
 ```
 """
-function unsafe_with_bumper(f, buf::AllocBuffer)
-    return with(f, CURRENT_ALLOCATOR => BumperAllocator(buf))
-end
-
-#####
-##### LockedBumperAllocator
-#####
-
-# An alternative route to thread safety: just lock the allocator before using it.
-# This helps with short-lived tasks (which shouldn't each get their own buffer)
-
-struct LockedBumperAllocator{B<:AllocBuffer} <: Allocator
-    bumper::BumperAllocator{B}
-    lock::ReentrantLock
-end
-function LockedBumperAllocator(buf::AllocBuffer)
-    return LockedBumperAllocator(BumperAllocator(buf), ReentrantLock())
-end
-Base.lock(f::Function, B::LockedBumperAllocator) = lock(f, B.lock)
-Base.lock(B::LockedBumperAllocator) = lock(B.lock)
-Base.unlock(B::LockedBumperAllocator) = unlock(B.lock)
-
-function alloc_similar(B::LockedBumperAllocator, args...)
-    return @lock(B, alloc_similar(B.bumper, args...))
+struct UncheckedBumperAllocator{B<:AllocBuffer} <: Allocator
+    buf::B
 end
 
 """
-    with_locked_bumper(f, buf::AllocBuffer)
+    UncheckedBumperAllocator(n_bytes::Int)
 
-Runs `f()` in the context of using a `LockedBumperAllocator` to
-allocate memory to `similar` calls on [`AllocArray`](@ref)s.
+Shorthand for `UncheckedBumperAllocator(AllocBuffer(n_bytes))`.
+"""
+UncheckedBumperAllocator(n_bytes::Int) = UncheckedBumperAllocator(AllocBuffer(n_bytes))
 
-All such allocations should occur within an `@no_escape` block,
-and of course, no such allocations should escape that block.
+"""
+    reset!(B::UncheckedBumperAllocator)
 
-Thread-safe: `f` may spawn multiple tasks or threads, which may each allocate memory using `similar` calls on `AllocArray`'s. However:
+Resets the `UncheckedBumperAllocator`, deallocating all of the arrays
+created by it.
 
-!!! warning
-    `f` must call `@no_escape` only outside of the threaded region, since deallocation in the bump allocator (via `@no_escape`) on one task will interfere with allocations on others.
+This must only be used if those arrays will not be accessed again.
+
+It is not safe to deallocate on one task while using the allocator
+to allocate on another task. Therefore this should only be called outside
+of threaded regions of code.
+"""
+function reset!(B::UncheckedBumperAllocator)
+    Bumper.reset_buffer!(B.buf)
+    return nothing
+end
+
+function alloc_similar(B::UncheckedBumperAllocator, ::AllocArray, ::Type{T}, dims::Dims) where {T}
+    inner = Bumper.alloc(T, B.buf, dims...)
+    return AllocArray(inner)
+end
+
+function alloc_similar(B::UncheckedBumperAllocator, ::Type{AllocArray{T,N,Arr}}, dims::Dims) where {T, N, Arr}
+    inner = Bumper.alloc(T, B.buf, dims...)
+    return AllocArray(inner)
+end
+
+#####
+##### BumperAllocator
+#####
+
+# Has safety checks
+# - concurrecy safety: protects access to buffer with a lock
+#   - this does not protect against `reset!` being called while a task is using the buffer!
+#   - but this allow allocations to occur on multiple tasks
+# - memory safety, when opted into with `CheckedAllocArray`
+#   - when `CheckedAllocArray` is used, we keep a reference to the `MemValid` associated to that array
+#   - on `reset!` we invalidate that object (using a write-lock)
+#   - every access to a `CheckedAllocArray` uses a read-lock to `MemValid` to ensure the memory is still valid
+
+"""
+    BumperAllocator(b::AllocBuffer)
+
+Use with [`with_allocator`](@ref) to dispatch `similar` calls
+for [`AllocArray`](@ref)s and [`CheckedAllocArray`](@ref)s
+to allocate using the buffer `b`, an `AllocBuffer` provided by
+Bumper.jl.
+
+Uses a lock to serialize allocations to the buffer `b`,
+which should allow safe concurrent usage.
+
+Used with [`reset!`](@ref) to deallocate. Note it is not safe
+to deallocate while another task may be allocating, except with
+[`CheckedAllocArray`](@ref)s which will error appropriately.
+
+See also: [`UncheckedBumperAllocator`](@ref).
 
 ## Example
 
 ```jldoctest
 using AllocArrays, Bumper
 
-buf = AllocBuffer()
+b = BumperAllocator(AllocBuffer(2^24)) # 16 MiB
 input = AllocArray([1,2,3])
 c = Channel(Inf)
-with_locked_bumper(buf) do
+with_allocator(b) do
     # ...code with may be multithreaded but which must not escape or return newly-allocated AllocArrays...
-    @no_escape buf begin # called outside of threaded region
-        @sync for i = 1:10
-            Threads.@spawn put!(c, sum(input .+ i))
-        end
+    @sync for i = 1:10
+        Threads.@spawn put!(c, sum(input .+ i))
     end
+    reset!(b) # called outside of threaded region
     close(c)
 end
 sum(collect(c))
@@ -148,6 +187,109 @@ sum(collect(c))
 225
 ```
 """
-function with_locked_bumper(f, buf::AllocBuffer)
-    return with(f, CURRENT_ALLOCATOR => LockedBumperAllocator(buf))
+struct BumperAllocator{B} <: Allocator
+    bumper::B
+    mems::Vector{MemValid}
+    # this lock protects access to `mems` and `buf`, and ensures
+    # we can make atomic "transactions" to add new memory or invalidate all memory
+    lock::ReentrantLock
+end
+
+function BumperAllocator(B::AllocBuffer)
+    return BumperAllocator(UncheckedBumperAllocator(B), MemValid[], ReentrantLock())
+end
+
+"""
+    BumperAllocator(n_bytes::Int)
+
+Shorthand for `BumperAllocator(AllocBuffer(n_bytes))`.
+"""
+BumperAllocator(n_bytes::Int) = BumperAllocator(AllocBuffer(n_bytes))
+
+Base.lock(B::BumperAllocator) = lock(B.lock)
+Base.unlock(B::BumperAllocator) = unlock(B.lock)
+
+# `CheckedAllocArray`
+
+function alloc_similar(B::BumperAllocator, c::CheckedAllocArray, ::Type{T},
+                       dims::Dims) where {T}
+    @lock B begin
+        # I think we do still need C's read lock, bc it could have been
+        # allocated by a DIFFERENT bumper which could be deallocating as we speak
+        # so to safely access `c.alloc_array` we should still use the read lock
+        inner = @lock(c, alloc_similar(B.bumper, _get_inner(c), T, dims))
+        valid = MemValid(true)
+        push!(B.mems, valid)
+        return CheckedAllocArray(inner, valid)
+    end
+end
+
+function alloc_similar(B::BumperAllocator, ::Type{CheckedAllocArray{T,N,Arr}},
+                       dims::Dims) where {T,N,Arr}
+    @lock B begin
+        inner = alloc_similar(B.bumper, Arr, dims)
+        valid = MemValid(true)
+        push!(B.mems, valid)
+        return CheckedAllocArray(inner, valid)
+    end
+end
+
+# `AllocArray`
+
+# If we have a `BumperAllocator` and are asked to allocate an unchecked array
+# then we can do that by dispatching to the inner bumper. We will still
+# get the lock for concurrency-safety.
+function alloc_similar(B::BumperAllocator, ::Type{AllocArray{T,N,Arr}},
+                       dims::Dims) where {T,N,Arr}
+    return @lock(B, alloc_similar(B.bumper, AllocArray{T,N,Arr}, dims))
+end
+
+function alloc_similar(B::BumperAllocator, a::AllocArray, ::Type{T},
+                       dims::Dims) where {T}
+    return @lock(B, alloc_similar(B.bumper, a, T, dims))
+end
+
+"""
+    reset!(b::BumperAllocator)
+
+Resets the `BumperAllocator`, deallocating all of the arrays
+created by it.
+
+This must only be used if those arrays will not be accessed again.
+However, [`CheckedAllocArray`](@ref)s allocated by this allocator will be marked
+invalid, causing future accesses to them to error, as a safety feature.
+[`AllocArray`](@ref)s have no such safety feature, and access to them
+after `reset!` is unsafe.
+
+It is also not safe to deallocate on one task while using the allocator
+to allocate on another task. Therefore this should only be called outside
+of threaded regions of code.
+"""
+function reset!(B::BumperAllocator)
+    @lock B begin
+        # Invalidate all memory first
+        for mem in B.mems
+            invalidate!(mem)
+        end
+        # Then empty the tracked memory
+        empty!(B.mems)
+
+        # Then reset the inner bumper
+        reset!(B.bumper)
+    end
+    return nothing
+end
+
+"""
+    with_allocator(f, allocator)
+
+Run `f` within a dynamic scope such that `similar` calls to
+[`AllocArray`](@ref)s and [`CheckedAllocArray`](@ref)s dispatch
+to allocator `allocator`.
+
+Used with allocators [`DefaultAllocator`](@ref), [`BumperAllocator`](@ref),
+and [`UncheckedBumperAllocator`](@ref).
+"""
+function with_allocator(f, allocator)
+    return with(f, CURRENT_ALLOCATOR => allocator)
 end
