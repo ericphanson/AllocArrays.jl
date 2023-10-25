@@ -148,7 +148,7 @@ end
 #####
 
 function Base.unsafe_convert(::Type{Ptr{T}}, a::CheckedAllocArray) where {T}
-    return @lock(a, Base.unsafe_convert(Type{Ptr{T}}, _get_inner(a)))
+    return @lock(a, Base.unsafe_convert(Ptr{T}, _get_inner(a)))
 end
 
 Base.elsize(::Type{<:CheckedAllocArray{T,N,Arr}}) where {T,N,Arr} = Base.elsize(Arr)
@@ -175,6 +175,6 @@ end
 # Also helps avoid reshaped arrays
 function Base.view(a::CheckedAllocArray{T,N},
                    i::Vararg{Union{Integer,AbstractRange,Colon},N}) where {T,N}
-    inner = @lock(a, view(_get_inner(a), i))
+    inner = @lock(a, view(_get_inner(a), i...))
     return CheckedAllocArray(inner, a.valid)
 end

@@ -109,6 +109,7 @@ end
     fresh_predictions() = [Matrix{Float32}(undef, n_class, size(x, 4)) for x in data]
 
     alloc_data = AllocArray.(data)
+    checked_alloc_data = CheckedAllocArray.(data)
 
     preds_data = fresh_predictions()
     infer!(preds_data, model, data)
@@ -116,17 +117,22 @@ end
     preds_alloc = fresh_predictions()
     infer!(preds_alloc, model, alloc_data)
 
+    preds_checked_alloc = fresh_predictions()
+    infer!(preds_checked_alloc, model, checked_alloc_data)
+
     preds_stride = fresh_predictions()
     stride_data = StrideArray.(data)
     infer!(preds_stride, model, stride_data)
 
     @test preds_data ≈ preds_alloc
     @test preds_data ≈ preds_stride
+    @test preds_data ≈ preds_checked_alloc
 
     predictions = fresh_predictions()
     @showtime infer!(predictions, model, data)
     @showtime infer!(predictions, model, stride_data)
     @showtime infer!(predictions, model, alloc_data)
+    @showtime infer!(predictions, model, checked_alloc_data)
 
     # Note: for max perf, consider
     # (using Functors)

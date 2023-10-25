@@ -1,4 +1,3 @@
-
 function checked_bumper_run(model, data)
     b = BumperAllocator(2^25) # 32 MiB
     # should be safe here because we don't allocate concurrently
