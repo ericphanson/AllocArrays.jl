@@ -8,6 +8,11 @@ Prototype that attempts to allow usage of [Bumper.jl](https://github.com/MasonPr
 
 This is accomplished by creating a wrapper type `AllocArray` which dispatches `similar` dynamically to an allocator depending on the contextual scope (using [ScopedValues.jl](https://github.com/vchuravy/ScopedValues.jl)).
 
+This package also provides a much safer `CheckedAllocArray` which keeps track of the validity
+of each allocated array, to provide an error in case of access to an invalid array. This
+can be used to test and develop code, before switching to `AllocArray` in case the overhead
+of these checks is prohibitive.
+
 Demo:
 
 ```julia
@@ -34,10 +39,10 @@ arr = ones(Float64, 100_000)
 @time basic_reduction(a) #  0.000494 seconds (21 allocations: 2.289 MiB)
 
 function bumper_reduction(a)
-    buf = BumperAllocator(2^24) # 16 MiB
-    with_allocator(buf) do
+    b = BumperAllocator(2^24) # 16 MiB
+    with_allocator(b) do
         ret = basic_reduction(a)
-        reset!(buf)
+        reset!(b)
         return ret
     end
 end
@@ -67,7 +72,8 @@ We can see in this example, we got ~100x less allocation, and similar runtime.
 
 ## Design notes
 
-This package does not create any Bumper.jl buffers, does not use any implicit ones, and does not reset any buffer that is handed to it. These choices are deliberate: the caller must create the buffer, pass it to AllocArrays.jl as desired, and reset it when they are done.
+The user is responsible for constructing buffers (via `AllocBuffer` or the constructors `BumperAllocator` and `UncheckedBumperAllocator`) and for resetting them (`reset!`).
+No implicit buffers are used, and `reset!` is never called in the package. These choices are deliberate: the caller must construct the buffer, pass it to AllocArrays.jl to be used when appropriate, and reset it when they are done.
 
 In particular, the caller must:
 - ...not reset a buffer in active use. E.g., do not call `reset!` on a buffer that may be used by another task
@@ -77,6 +83,9 @@ In particular, the caller must:
 ## Safety
 
 Before using a bump allocator (`BumperAllocator`, or `UncheckedBumperAllocator`) it is recommended the user read the [Bumper.jl README](https://github.com/MasonProtter/Bumper.jl#bumperjl) to understand how it works and what the limitations are.
+
+It is also recommended to start with `CheckedAllocArray` (with `BumperAllocator`)
+and move to using `AllocArray` only when necessary on well-tested code.
 
 Note also:
 

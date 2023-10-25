@@ -1,10 +1,10 @@
 
 function checked_bumper_run(model, data)
-    buf = BumperAllocator(2^25) # 32 MiB
+    b = BumperAllocator(2^25) # 32 MiB
     # should be safe here because we don't allocate concurrently
-    with_allocator(buf) do
+    with_allocator(b) do
         result = sum(model, data)
-        reset!(buf)
+        reset!(b)
         return result
     end
 end
@@ -25,23 +25,23 @@ end
 
 @testset "basic escape" begin
     input = CheckedAllocArray([1.0])
-    buf = BumperAllocator(2^23) # 8 MiB
-    y = with_allocator(buf) do
+    b = BumperAllocator(2^23) # 8 MiB
+    y = with_allocator(b) do
         y = similar(input)
         y .= 2
-        reset!(buf)
+        reset!(b)
         return y
     end
     @test_throws InvalidMemoryException y[1]
 end
 
 function bad_function_1(a)
-    buf = BumperAllocator(2^23) # 8 MiB
+    b = BumperAllocator(2^23) # 8 MiB
     output = []
-    with_allocator(buf) do
+    with_allocator(b) do
         result = some_allocating_function(a)
         push!(output, result.b) # wrong! `b` is escaping `reset`!
-        reset!(buf)
+        reset!(b)
     end
     return sum(output...)
 end

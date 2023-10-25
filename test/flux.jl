@@ -1,11 +1,11 @@
 using Flux, Random, StrideArraysCore
 
 function bumper_run(model, data)
-    buf = UncheckedBumperAllocator(2^25) # 32 MiB
+    b = UncheckedBumperAllocator(2^25) # 32 MiB
     # should be safe here because we don't allocate concurrently
-    with_allocator(buf) do
+    with_allocator(b) do
         result = sum(model, data)
-        reset!(buf)
+        reset!(b)
         return result
     end
 end
@@ -81,13 +81,13 @@ end
 (m::DigitsModel)(x) = m.chain(x)
 
 function infer!(predictions, model, data)
-    buf = BumperAllocator(2^26) # 64 MiB
+    b = BumperAllocator(2^26) # 64 MiB
     # Here we use a locked bumper for thread-safety, since NNlib multithreads
     # some of it's functions. However we are sure to only deallocate outside of the threaded region. (All concurrency occurs within the `model` call itself).
-    with_allocator(buf) do
+    with_allocator(b) do
         for (idx, x) in enumerate(data)
             predictions[idx] .= model(x)
-            reset!(buf) # reset `buf` after each batch
+            reset!(b) # reset `b` after each batch
         end
     end
     return predictions

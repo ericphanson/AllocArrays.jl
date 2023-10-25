@@ -49,7 +49,9 @@ end
 
 function alloc_similar(::DefaultAllocator, ::Type{CheckedAllocArray{T,N,Arr}},
                        dims::Dims) where {T, N, Arr}
-    return CheckedAllocArray(similar(Arr, dims))
+    # We know the memory is valid since it was allocated with the
+    # default allocator
+    return CheckedAllocArray(similar(Arr, dims), MemValid(true))
 end
 
 #####
