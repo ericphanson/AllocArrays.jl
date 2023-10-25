@@ -35,11 +35,11 @@ function basic_reduction(a)
 end
 
 arr = ones(Float64, 100_000)
-@time basic_reduction(a) #  0.129436 seconds (181.10 k allocations: 14.228 MiB, 99.11% compilation time)
-@time basic_reduction(a) #  0.000494 seconds (21 allocations: 2.289 MiB)
+@time basic_reduction(arr) #  0.057540 seconds (209.39 k allocations: 16.487 MiB, 99.48% compilation time)
+@time basic_reduction(arr) #  0.000265 seconds (7 allocations: 2.289 MiB)
 
-function bumper_reduction(a)
-    b = BumperAllocator(2^24) # 16 MiB
+
+function bumper_reduction!(b, a)
     with_allocator(b) do
         ret = basic_reduction(a)
         reset!(b)
@@ -47,28 +47,31 @@ function bumper_reduction(a)
     end
 end
 
+b = BumperAllocator(2^24) # 16 MiB
 a = AllocArray(arr);
 
-@time bumper_reduction(a) #  0.010638 seconds (16.28 k allocations: 1.129 MiB, 89.93% compilation time)
-@time bumper_reduction(a) #  0.000528 seconds (25 allocations: 800 bytes)
+@time bumper_reduction!(b, a) #  0.223121 seconds (748.98 k allocations: 2.045 GiB, 4.32% gc time, 97.59% compilation time)
+@time bumper_reduction!(b, a) #  0.000311 seconds (36 allocations: 1.172 KiB)
 ```
 
-We can see we brought allocations down from 2.289 MiB to 800 bytes.
+We can see we brought allocations down from 2.289 MiB to ~1 KiB.
 
 For a less-toy example, in `test/flux.jl` we test inference over a Flux model:
 
 ```julia
 # Baseline: Array
-infer!(predictions, model, data): 1.824578 seconds (59.50 k allocations: 2.841 GiB, 10.10% gc time)
+infer!(predictions, model, data): 0.457247 seconds (8.02 k allocations: 370.796 MiB, 6.10% gc time)
 # Baseline: StrideArray
 stride_data = StrideArray.(data)
-infer!(predictions, model, stride_data): 1.741713 seconds (59.50 k allocations: 2.841 GiB, 11.00% gc time)
+infer!(predictions, model, stride_data): 0.336535 seconds (8.05 k allocations: 370.796 MiB, 6.20% gc time)
 # Using AllocArray:
 alloc_data = AllocArray.(data)
-infer!(predictions, model, alloc_data): 1.773365 seconds (150.89 k allocations: 30.338 MiB, 0.53% gc time)
+infer!(predictions, model, alloc_data): 0.318736 seconds (13.35 k allocations: 67.225 MiB)
+checked_alloc_data = CheckedAllocArray.(data)
+infer!(predictions, model, checked_alloc_data): 23.673344 seconds (26.15 k allocations: 67.773 MiB)
 ```
 
-We can see in this example, we got ~100x less allocation, and similar runtime.
+We can see in this example, we got much less allocation (and no GC time), and similar runtime. By running larger examples, the gap in allocations can be much larger; here we use a 64 MiB buffer that we allocate each `infer!` call, which accounts for most of the memory usage.
 
 ## Design notes
 
