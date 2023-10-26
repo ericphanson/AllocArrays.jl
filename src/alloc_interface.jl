@@ -5,10 +5,15 @@
 
 Allocators need to subtype `Allocator` and implement two methods of `alloc_similar`:
 
-- `AllocArrays.alloc_similar(::Allocator, arr, ::Type{T}, dims::Dims)`
-- `AllocArrays.alloc_similar(::Allocator, ::Type{Arr}, dims::Dims) where {Arr<:AbstractArray}`
+- `AllocArrays.alloc_similar(::MyAllocator, a::AllocArray, ::Type{T}, dims::Dims)`
+- `AllocArrays.alloc_similar(::MyAllocator, ::Type{<:AllocArray{T}}, dims::Dims) where {T}`
 
-where the latter is used by broadcasting.
+to support `AllocArrays`, (which should each return an `AllocArray`) and likewise
+
+- `AllocArrays.alloc_similar(::MyAllocator, a::CheckedAllocArray, ::Type{T}, dims::Dims)`
+- `AllocArrays.alloc_similar(::MyAllocator, ::Type{<:CheckedAllocArray{T}}, dims::Dims) where {T}`
+
+which should each return a `CheckedAllocArray`.
 """
 abstract type Allocator end
 
@@ -38,20 +43,22 @@ function alloc_similar(::DefaultAllocator, ::AllocArray, ::Type{T}, dims::Dims) 
     return AllocArray(similar(Array{T}, dims))
 end
 
-function alloc_similar(::DefaultAllocator, ::Type{AllocArray{T,N,Arr}},
-                       dims::Dims) where {T, N, Arr}
-    return AllocArray(similar(Arr, dims))
+function alloc_similar(::DefaultAllocator, ::Type{<:AllocArray{T}},
+                       dims::Dims) where {T}
+    return AllocArray(similar(Array{T}, dims))
 end
 
-function alloc_similar(::DefaultAllocator, ::CheckedAllocArray, ::Type{T}, dims::Dims) where {T}
-    return CheckedAllocArray(similar(Array{T}, dims))
-end
-
-function alloc_similar(::DefaultAllocator, ::Type{CheckedAllocArray{T,N,Arr}},
-                       dims::Dims) where {T, N, Arr}
+function alloc_similar(D::DefaultAllocator, c::CheckedAllocArray, ::Type{T},
+                       dims::Dims) where {T}
     # We know the memory is valid since it was allocated with the
     # default allocator
-    return CheckedAllocArray(similar(Arr, dims), MemValid(true))
+    a = @lock(c, alloc_similar(D, _get_inner(c), T, dims))
+    return CheckedAllocArray(a, MemValid(true))
+end
+
+function alloc_similar(D::DefaultAllocator, ::Type{<:CheckedAllocArray{T}},
+                       dims::Dims) where {T}
+    return CheckedAllocArray(alloc_similar(D, AllocArray{T}, dims), MemValid(true))
 end
 
 #####
@@ -125,12 +132,14 @@ function reset!(B::UncheckedBumperAllocator)
     return nothing
 end
 
-function alloc_similar(B::UncheckedBumperAllocator, ::AllocArray, ::Type{T}, dims::Dims) where {T}
+function alloc_similar(B::UncheckedBumperAllocator, ::AllocArray, ::Type{T},
+                       dims::Dims) where {T}
     inner = Bumper.alloc(T, B.buf, dims...)
     return AllocArray(inner)
 end
 
-function alloc_similar(B::UncheckedBumperAllocator, ::Type{AllocArray{T,N,Arr}}, dims::Dims) where {T, N, Arr}
+function alloc_similar(B::UncheckedBumperAllocator, ::Type{<:AllocArray{T}},
+                       dims::Dims) where {T}
     inner = Bumper.alloc(T, B.buf, dims...)
     return AllocArray(inner)
 end
@@ -224,10 +233,10 @@ function alloc_similar(B::BumperAllocator, c::CheckedAllocArray, ::Type{T},
     end
 end
 
-function alloc_similar(B::BumperAllocator, ::Type{CheckedAllocArray{T,N,Arr}},
-                       dims::Dims) where {T,N,Arr}
+function alloc_similar(B::BumperAllocator, ::Type{<:CheckedAllocArray{T}},
+                       dims::Dims) where {T}
     @lock B begin
-        inner = alloc_similar(B.bumper, Arr, dims)
+        inner = alloc_similar(B.bumper, AllocArray{T}, dims)
         valid = MemValid(true)
         push!(B.mems, valid)
         return CheckedAllocArray(inner, valid)
@@ -239,9 +248,9 @@ end
 # If we have a `BumperAllocator` and are asked to allocate an unchecked array
 # then we can do that by dispatching to the inner bumper. We will still
 # get the lock for concurrency-safety.
-function alloc_similar(B::BumperAllocator, ::Type{AllocArray{T,N,Arr}},
-                       dims::Dims) where {T,N,Arr}
-    return @lock(B, alloc_similar(B.bumper, AllocArray{T,N,Arr}, dims))
+function alloc_similar(B::BumperAllocator, ::Type{<:AllocArray{T}},
+                       dims::Dims) where {T}
+    return @lock(B, alloc_similar(B.bumper, AllocArray{T}, dims))
 end
 
 function alloc_similar(B::BumperAllocator, a::AllocArray, ::Type{T},

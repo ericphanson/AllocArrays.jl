@@ -121,8 +121,8 @@ end
 Base.IndexStyle(::Type{<:CheckedAllocArray{T,N,Arr}}) where {T,N,Arr} = Base.IndexStyle(Arr)
 
 # used only by broadcasting?
-function Base.similar(::Type{CheckedAllocArray{T,N,Arr}}, dims::Dims) where {T,N,Arr}
-    return alloc_similar(CURRENT_ALLOCATOR[], CheckedAllocArray{T,N,Arr}, dims)
+function Base.similar(::Type{<:CheckedAllocArray{T}}, dims::Dims) where {T}
+    return alloc_similar(CURRENT_ALLOCATOR[], CheckedAllocArray{T}, dims)
 end
 
 function Base.similar(a::CheckedAllocArray, ::Type{T}, dims::Dims) where {T}
@@ -133,13 +133,13 @@ end
 ##### Broadcasting
 #####
 
-function Base.BroadcastStyle(::Type{CheckedAllocArray{T,N,Arr}}) where {T,N,Arr}
-    return Broadcast.ArrayStyle{CheckedAllocArray{T,N,Arr}}()
+function Base.BroadcastStyle(::Type{<:CheckedAllocArray})
+    return ArrayStyle{CheckedAllocArray}()
 end
 
-function Base.similar(bc::Broadcasted{ArrayStyle{CheckedAllocArray{T,N,Arr}}},
-                      ::Type{ElType}) where {T,N,Arr,ElType}
-    return similar(CheckedAllocArray{T,N,Arr}, axes(bc))::CheckedAllocArray
+function Base.similar(bc::Broadcasted{ArrayStyle{CheckedAllocArray}},
+                      ::Type{T}) where {T}
+    return similar(CheckedAllocArray{T}, axes(bc))::CheckedAllocArray
 end
 
 #####

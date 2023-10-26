@@ -44,8 +44,8 @@ Base.size(a::AllocArray) = size(getfield(a, :arr))
 Base.IndexStyle(::Type{<:AllocArray{T,N,Arr}}) where {T,N,Arr} = Base.IndexStyle(Arr)
 
 # used only by broadcasting?
-function Base.similar(::Type{AllocArray{T,N,Arr}}, dims::Dims) where {T,N,Arr}
-    return alloc_similar(CURRENT_ALLOCATOR[], AllocArray{T,N,Arr}, dims)
+function Base.similar(::Type{<:AllocArray{T}}, dims::Dims) where {T}
+    return alloc_similar(CURRENT_ALLOCATOR[], AllocArray{T}, dims)
 end
 
 function Base.similar(a::AllocArray, ::Type{T}, dims::Dims) where {T}
@@ -56,13 +56,13 @@ end
 ##### Broadcasting
 #####
 
-function Base.BroadcastStyle(::Type{AllocArray{T,N,Arr}}) where {T,N,Arr}
-    return Broadcast.ArrayStyle{AllocArray{T,N,Arr}}()
+function Base.BroadcastStyle(::Type{<:AllocArray})
+    return ArrayStyle{AllocArray}()
 end
 
-function Base.similar(bc::Broadcasted{ArrayStyle{AllocArray{T,N,Arr}}},
-                      ::Type{ElType}) where {T,N,Arr,ElType}
-    return similar(AllocArray{T,N,Arr}, axes(bc))
+function Base.similar(bc::Broadcasted{ArrayStyle{AllocArray}},
+                      ::Type{T}) where {T}
+    return similar(AllocArray{T}, axes(bc))
 end
 
 #####

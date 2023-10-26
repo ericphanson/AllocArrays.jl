@@ -80,8 +80,7 @@ end
 # Our model acts on input just by applying the chain.
 (m::DigitsModel)(x) = m.chain(x)
 
-function infer!(predictions, model, data)
-    b = BumperAllocator(2^26) # 64 MiB
+function infer!(b, predictions, model, data)
     # Here we use a locked bumper for thread-safety, since NNlib multithreads
     # some of it's functions. However we are sure to only deallocate outside of the threaded region. (All concurrency occurs within the `model` call itself).
     with_allocator(b) do
@@ -95,6 +94,8 @@ end
 
 @testset "More complicated model" begin
     model = DigitsModel()
+
+    b = BumperAllocator(2^26) # 64 MiB
 
     # Setup some fake data
     N = 1_000
@@ -112,32 +113,35 @@ end
     checked_alloc_data = CheckedAllocArray.(data)
 
     preds_data = fresh_predictions()
-    infer!(preds_data, model, data)
+    infer!(b, preds_data, model, data)
 
     preds_alloc = fresh_predictions()
-    infer!(preds_alloc, model, alloc_data)
+    infer!(b, preds_alloc, model, alloc_data)
 
     preds_checked_alloc = fresh_predictions()
-    infer!(preds_checked_alloc, model, checked_alloc_data)
+    infer!(b, preds_checked_alloc, model, checked_alloc_data)
 
     preds_stride = fresh_predictions()
     stride_data = StrideArray.(data)
-    infer!(preds_stride, model, stride_data)
+    infer!(b, preds_stride, model, stride_data)
 
     @test preds_data ≈ preds_alloc
     @test preds_data ≈ preds_stride
     @test preds_data ≈ preds_checked_alloc
 
     predictions = fresh_predictions()
-    @showtime infer!(predictions, model, data)
-    @showtime infer!(predictions, model, stride_data)
-    @showtime infer!(predictions, model, alloc_data)
-    @showtime infer!(predictions, model, checked_alloc_data)
+    @showtime infer!(b, predictions, model, data)
+    @showtime infer!(b, predictions, model, stride_data)
+    @showtime infer!(b, predictions, model, alloc_data)
+    @showtime infer!(b, predictions, model, checked_alloc_data)
 
     # Note: for max perf, consider
-    # (using Functors)
+    # using Functors
     # model = fmap(AllocArray ∘ PtrArray, model; exclude = x -> x isa AbstractArray)
-    # and `alloc_data = AllocArray.(PtrArray.(data))`
+    # alloc_data = AllocArray.(PtrArray.(data))
+    # @showtime infer!(b, predictions, model, alloc_data)
+    # @showtime infer!(b, predictions, model, alloc_data)
     # Together, that ensure everything is an `AllocArray(PtrArray(...))`
-    # This seems to help although not a huge amount.
+    # This seems to help with runtime although not a huge amount,
+    # and doesn't really help with allocations.
 end
