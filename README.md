@@ -60,18 +60,18 @@ For a less-toy example, in `test/flux.jl` we test inference over a Flux model:
 
 ```julia
 # Baseline: Array
-infer!(predictions, model, data): 0.457247 seconds (8.02 k allocations: 370.796 MiB, 6.10% gc time)
+infer!(b, predictions, model, data): 0.499735 seconds (8.05 k allocations: 306.796 MiB, 6.47% gc time)
 # Baseline: StrideArray
 stride_data = StrideArray.(data)
-infer!(predictions, model, stride_data): 0.336535 seconds (8.05 k allocations: 370.796 MiB, 6.20% gc time)
+infer!(b, predictions, model, stride_data): 0.364180 seconds (8.05 k allocations: 306.796 MiB, 8.32% gc time)
 # Using AllocArray:
 alloc_data = AllocArray.(data)
-infer!(predictions, model, alloc_data): 0.318736 seconds (13.35 k allocations: 67.225 MiB)
+infer!(b, predictions, model, alloc_data): 0.351953 seconds (13.60 k allocations: 3.221 MiB)
 checked_alloc_data = CheckedAllocArray.(data)
-infer!(predictions, model, checked_alloc_data): 23.673344 seconds (26.15 k allocations: 67.773 MiB)
+infer!(b, predictions, model, checked_alloc_data): 15.522897 seconds (25.54 k allocations: 3.742 MiB)
 ```
 
-We can see in this example, we got much less allocation (and no GC time), and similar runtime. By running larger examples, the gap in allocations can be much larger; here we use a 64 MiB buffer that we allocate each `infer!` call, which accounts for most of the memory usage.
+We can see in this example, we got 100x less allocation (and no GC time), and similar runtime, for `AllocArray`s. We can see `CheckedAllocArrays` are far slower here.
 
 ## Design notes
 
