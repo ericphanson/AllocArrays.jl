@@ -11,7 +11,7 @@ ScopedValues = "7e506255-f358-4e82-b7e4-beb19740aa63"
 
 [compat]
 Aqua = "0.7"
-Bumper = "0.4"
+Bumper = "0.5"
 ConcurrentUtilities = "2.2.1"
 PrecompileTools = "1.2"
 ScopedValues = "1"

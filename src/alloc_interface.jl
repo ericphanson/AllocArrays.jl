@@ -134,13 +134,13 @@ end
 
 function alloc_similar(B::UncheckedBumperAllocator, ::AllocArray, ::Type{T},
                        dims::Dims) where {T}
-    inner = Bumper.alloc(T, B.buf, dims...)
+    inner = Bumper.alloc!(B.buf, T, dims...)
     return AllocArray(inner)
 end
 
 function alloc_similar(B::UncheckedBumperAllocator, ::Type{<:AllocArray{T}},
                        dims::Dims) where {T}
-    inner = Bumper.alloc(T, B.buf, dims...)
+    inner = Bumper.alloc!(B.buf, T, dims...)
     return AllocArray(inner)
 end
 
