@@ -48,7 +48,7 @@ struct DigitsModel
 end
 
 # Ensure Flux can recurse into our model to find params etc
-Flux.@functor DigitsModel (chain,)
+Flux.@layer DigitsModel trainable=(chain,)
 
 # Construct the actual model from a config object. This is the only
 # constructor that should be used, to ensure the model is created just
