@@ -22,7 +22,7 @@ jobs:
       fail-fast: false
       matrix:
         version:
-          - '1.8' # earliest supported version
+          - '1.10' # earliest supported version
           - '1' # stable
           - 'nightly'
         os:
