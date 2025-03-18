@@ -60,12 +60,11 @@ For a less-toy example, in `test/flux.jl` we test inference over a Flux model:
 
 ```julia
 # Baseline: Array
-infer!(b, predictions, model, data): 0.260319 seconds (6.76 k allocations: 221.507 MiB, 50.35% gc time)
-# Using AllocArray:
+infer!(b, predictions, model, data): 0.163573 seconds (6.77 k allocations: 221.508 MiB, 16.42% gc time)# Using AllocArray:
 alloc_data = AllocArray.(data)
-infer!(b, predictions, model, alloc_data): 0.114539 seconds (8.68 k allocations: 847.672 KiB)
+infer!(b, predictions, model, alloc_data): 0.114566 seconds (8.72 k allocations: 777.547 KiB)
 checked_alloc_data = CheckedAllocArray.(data)
-infer!(b, predictions, model, checked_alloc_data): 13.225971 seconds (22.66 k allocations: 1.444 MiB)
+infer!(b, predictions, model, checked_alloc_data): 13.721077 seconds (22.54 k allocations: 1.354 MiB)
 ```
 
 We can see in this example, we got 200x less allocation (and no GC time), and similar runtime, for `AllocArray`s. We can see `CheckedAllocArrays` are far slower here.

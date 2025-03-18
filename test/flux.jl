@@ -121,9 +121,6 @@ end
     preds_checked_alloc = fresh_predictions()
     infer!(b, preds_checked_alloc, model, checked_alloc_data)
 
-    preds_stride = fresh_predictions()
-    infer!(b, preds_stride, model, stride_data)
-
     @test preds_data ≈ preds_alloc
     @test preds_data ≈ preds_checked_alloc
 

@@ -4,9 +4,9 @@ using Base.Broadcast: Broadcasted, ArrayStyle
 using UnsafeArrays: UnsafeArray
 
 """
-    struct AllocArray{T,N,R} <: DenseArray{T,N}
+    struct AllocArray{T,N} <: DenseArray{T,N}
         arr::UnsafeArray{T,N}
-        gcref::R
+        gcref::Any
     end
 
     AllocArray(arr::AbstractArray)
@@ -17,6 +17,8 @@ but dispatches `similar` to special allocation methods.
 The inner array `arr` is always represented as an `UnsafeArray`,
 but the field `gcref` may hold a materialized `AbstractArray` corresponding
 to the same data, which is held to preserve a reference to the data to prevent GC.
+This field is never accessed or used, so the `::Any` type does not affect type stability
+of code using AllocArrays.
 
 Use the constructor `AllocArray(arr)` to construct an `AllocArray`. Note that `arr`
 must be able to be represented as an `UnsafeArray`, meaning it must be a bits-type
@@ -27,18 +29,18 @@ which is expected to use `similar` based on this input for further allocations.
 When inside a `with_allocator` block, `similar` can be dispatched to a
 (dynamically-scoped) bump allocator.
 """
-struct AllocArray{T,N,R} <: DenseArray{T,N}
+struct AllocArray{T,N} <: DenseArray{T,N}
     arr::UnsafeArray{T,N}
-    gcref::R
+    gcref::Any
 
     function AllocArray(gcref::AbstractArray)
         arr = UnsafeArray(pointer(gcref), size(gcref))
-        return new{eltype(arr),ndims(arr),typeof(gcref)}(arr, gcref)
+        return new{eltype(arr),ndims(arr)}(arr, gcref)
     end
 
     # already allocated with Bumper, no gcref needed
     function AllocArray(arr::UnsafeArray)
-        return new{eltype(arr),ndims(arr),Nothing}(arr, nothing)
+        return new{eltype(arr),ndims(arr)}(arr, nothing)
     end
 end
 
