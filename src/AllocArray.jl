@@ -33,17 +33,19 @@ struct AllocArray{T,N} <: DenseArray{T,N}
     arr::UnsafeArray{T,N}
     gcref::Any
 
-    function AllocArray(gcref::AbstractArray)
+    AllocArray(gcref::AbstractArray{T,N}) where {T,N} = AllocArray{T,N}(gcref)
+    function AllocArray{T,N}(gcref::AbstractArray{T,N}) where {T,N}
         arr = UnsafeArray(pointer(gcref), size(gcref))
         return new{eltype(arr),ndims(arr)}(arr, gcref)
     end
 
     # already allocated with Bumper, no gcref needed
-    function AllocArray(arr::UnsafeArray)
-        return new{eltype(arr),ndims(arr)}(arr, nothing)
-    end
+    AllocArray(arr::UnsafeArray{T,N}) where {T,N} = AllocArray{T,N}(arr)
+    AllocArray{T,N}(arr::UnsafeArray{T,N}) where {T,N} = new{T,N}(arr, nothing)
+
 
     AllocArray(a::AllocArray) = a
+    AllocArray{T,N}(a::AllocArray{T,N}) where {T,N} = a
 end
 
 AllocMatrix{T} = AllocArray{T,2}
