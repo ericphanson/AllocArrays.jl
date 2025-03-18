@@ -16,11 +16,10 @@ jobs:
       - uses: actions/checkout@v4
       - uses: julia-actions/setup-julia@v2
         with:
-          version: '1'                         # replace this with whatever version you need
+          version: '1.10'                         # replace this with whatever version you need
           show-versioninfo: true               # this causes versioninfo to be printed to the action log
       - uses: julia-actions/cache@v2              # cache using https://github.com/julia-actions/cache
       - uses: julia-actions/julia-buildpkg@v1  # if package requires Pkg.build()
       - uses: julia-actions/julia-docdeploy@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }} # For authentication with SSH deploy key
