@@ -35,8 +35,8 @@ function basic_reduction(a)
 end
 
 arr = ones(Float64, 100_000)
-@time basic_reduction(arr) #  0.057540 seconds (209.39 k allocations: 16.487 MiB, 99.48% compilation time)
-@time basic_reduction(arr) #  0.000265 seconds (7 allocations: 2.289 MiB)
+@time basic_reduction(arr) # 0.068864 seconds (377.41 k allocations: 21.811 MiB, 99.47% compilation time)
+@time basic_reduction(arr) # 0.007774 seconds (10 allocations: 2.289 MiB, 94.21% gc time)
 
 
 function bumper_reduction!(b, a)
@@ -50,8 +50,8 @@ end
 b = BumperAllocator(2^24) # 16 MiB
 a = AllocArray(arr);
 
-@time bumper_reduction!(b, a) #  0.223121 seconds (748.98 k allocations: 2.045 GiB, 4.32% gc time, 97.59% compilation time)
-@time bumper_reduction!(b, a) #  0.000311 seconds (36 allocations: 1.172 KiB)
+@time bumper_reduction!(b, a) #  0.246476 seconds (1.05 M allocations: 52.495 MiB, 19.78% gc time, 99.65% compilation time)
+@time bumper_reduction!(b, a) #  0.000226 seconds (27 allocations: 832 bytes)
 ```
 
 We can see we brought allocations down from 2.289 MiB to ~1 KiB.
@@ -60,18 +60,49 @@ For a less-toy example, in `test/flux.jl` we test inference over a Flux model:
 
 ```julia
 # Baseline: Array
-infer!(b, predictions, model, data): 0.499735 seconds (8.05 k allocations: 306.796 MiB, 6.47% gc time)
-# Baseline: StrideArray
-stride_data = StrideArray.(data)
-infer!(b, predictions, model, stride_data): 0.364180 seconds (8.05 k allocations: 306.796 MiB, 8.32% gc time)
-# Using AllocArray:
+infer!(b, predictions, model, data): 0.163573 seconds (6.77 k allocations: 221.508 MiB, 16.42% gc time)# Using AllocArray:
 alloc_data = AllocArray.(data)
-infer!(b, predictions, model, alloc_data): 0.351953 seconds (13.60 k allocations: 3.221 MiB)
+infer!(b, predictions, model, alloc_data): 0.114566 seconds (8.72 k allocations: 777.547 KiB)
+# see "Usage with Flux" below for `recursive_alloc_arrays` and `infer!`
+aa_model = recursive_alloc_arrays(model)
+infer!(b, predictions, aa_model, alloc_data): 0.113104 seconds (7.69 k allocations: 688.047 KiB)
+# checked example (use for testing)
 checked_alloc_data = CheckedAllocArray.(data)
-infer!(b, predictions, model, checked_alloc_data): 15.522897 seconds (25.54 k allocations: 3.742 MiB)
+infer!(b, predictions, model, checked_alloc_data): 13.721077 seconds (22.54 k allocations: 1.354 MiB)
 ```
 
-We can see in this example, we got 100x less allocation (and no GC time), and similar runtime, for `AllocArray`s. We can see `CheckedAllocArrays` are far slower here.
+We can see in this example, we got 200x less allocation (and no GC time), and similar runtime, for `AllocArray`s. We also can reduce allocations a bit more with `aa_model` than `model`. We see `CheckedAllocArrays` are far slower.
+
+## Usage with Flux
+
+For reducing allocations as much as possible with Flux models, we can use `recursive_alloc_arrays` below to convert a model to use `AllocArray`s. This will convert all arrays in the model to `AllocArray`s, and will also convert any arrays in the model's parameters to `AllocArray`s. This way, any layers during the forward pass of the model which use `similar` calls based on the layer's parameters will use the bump allocator, when the forward pass is invoked within `with_allocator`.
+
+```julia
+using Functors
+
+function recursive_alloc_arrays(obj)
+    return fmap(x -> begin
+        x isa AbstractArray || return x
+        isbitstype(eltype(x)) || return x
+        return AllocArray(x)
+    end, obj; exclude=x -> x isa AbstractArray{<:Number} || x isa Function)
+end
+
+function infer!(b::BumpAllocator, predictions, model, data)
+    # Here we use a locked bumper for thread-safety, since NNlib multithreads
+    # some of it's functions. However we are sure to only deallocate outside of the threaded region. (All concurrency occurs within the `model` call itself).
+    with_allocator(b) do
+        for (idx, x) in enumerate(data)
+            predictions[idx] .= model(x)
+            reset!(b) # reset `b` after each batch
+        end
+    end
+    # don't escape bump-allocated memory!
+    return predictions
+end
+```
+
+The specific function to use here may need to be adjusted depending on the details of the model and Functors.jl. This one is tested in `test/flux.jl` on a simple model.
 
 ## Design notes
 
@@ -82,6 +113,8 @@ In particular, the caller must:
 - ...not reset a buffer in active use. E.g., do not call `reset!` on a buffer that may be used by another task
 - ...not allow memory allocated with a buffer to be live after the underlying buffer has been reset
 - ...reset their buffers before it runs out of memory
+
+In v0.3, AllocArrays started representing the inner array as an `UnsafeArray` always, rather than only when allocated via `similar`. This seems to avoid a Julia bug around missing vectorization: https://github.com/JuliaLang/julia/issues/57799.
 
 ## Safety
 
