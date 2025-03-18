@@ -47,4 +47,7 @@ end
 
     a = CheckedAllocArray(collect(1:4))
     @test a[1:2] .+ a[3:4]' isa CheckedAllocArray
+
+    # Constructor does not recurse
+    @test AllocArray(a) === a
 end

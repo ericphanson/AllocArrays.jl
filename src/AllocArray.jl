@@ -42,6 +42,8 @@ struct AllocArray{T,N} <: DenseArray{T,N}
     function AllocArray(arr::UnsafeArray)
         return new{eltype(arr),ndims(arr)}(arr, nothing)
     end
+
+    AllocArray(a::AllocArray) = a
 end
 
 AllocMatrix{T} = AllocArray{T,2}
