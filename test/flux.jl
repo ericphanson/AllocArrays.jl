@@ -1,4 +1,4 @@
-using Flux, Random, StrideArraysCore
+using Flux, Random
 
 function bumper_run(model, data)
     b = UncheckedBumperAllocator(2^25) # 32 MiB
@@ -122,26 +122,13 @@ end
     infer!(b, preds_checked_alloc, model, checked_alloc_data)
 
     preds_stride = fresh_predictions()
-    stride_data = StrideArray.(data)
     infer!(b, preds_stride, model, stride_data)
 
     @test preds_data ≈ preds_alloc
-    @test preds_data ≈ preds_stride
     @test preds_data ≈ preds_checked_alloc
 
     predictions = fresh_predictions()
-    @showtime infer!(b, predictions, model, data)
-    @showtime infer!(b, predictions, model, stride_data)
-    @showtime infer!(b, predictions, model, alloc_data)
-    @showtime infer!(b, predictions, model, checked_alloc_data)
-
-    # Note: for max perf, consider
-    # using Functors
-    # model = fmap(AllocArray ∘ PtrArray, model; exclude = x -> x isa AbstractArray)
-    # alloc_data = AllocArray.(PtrArray.(data))
-    # @showtime infer!(b, predictions, model, alloc_data)
-    # @showtime infer!(b, predictions, model, alloc_data)
-    # Together, that ensure everything is an `AllocArray(PtrArray(...))`
-    # This seems to help with runtime although not a huge amount,
-    # and doesn't really help with allocations.
+    @showtime infer!(b, predictions, model, data);
+    @showtime infer!(b, predictions, model, alloc_data);
+    @showtime infer!(b, predictions, model, checked_alloc_data);
 end
