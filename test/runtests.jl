@@ -49,5 +49,6 @@ end
     @test a[1:2] .+ a[3:4]' isa CheckedAllocArray
 
     # Constructor does not recurse
-    @test AllocArray(a) === a
+    @test AllocArray(a).gcref === a.gcref
+    @test AllocArray(a).arr === a.arr
 end
