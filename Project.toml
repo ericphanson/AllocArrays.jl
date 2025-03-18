@@ -14,6 +14,7 @@ UnsafeArrays = "c4a57d5a-5b31-53a6-b365-19f8c011fbd6"
 Aqua = "0.7"
 Bumper = "0.7"
 ConcurrentUtilities = "2.2.1"
+Functors = "0.5.2"
 PrecompileTools = "1.2"
 ScopedValues = "1"
 UnsafeArrays = "1.0.6"
@@ -22,8 +23,9 @@ julia = "1.10"
 [extras]
 Aqua = "4c88cf16-eb10-579e-8560-4a9242c79595"
 Flux = "587475ba-b771-5e3f-ad9e-33799f191a9c"
+Functors = "d9f16b24-f501-4c13-a1f2-28368ffc5196"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["Aqua", "Flux", "Random", "Test"]
+test = ["Aqua", "Flux", "Functors", "Random", "Test"]

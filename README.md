@@ -63,11 +63,46 @@ For a less-toy example, in `test/flux.jl` we test inference over a Flux model:
 infer!(b, predictions, model, data): 0.163573 seconds (6.77 k allocations: 221.508 MiB, 16.42% gc time)# Using AllocArray:
 alloc_data = AllocArray.(data)
 infer!(b, predictions, model, alloc_data): 0.114566 seconds (8.72 k allocations: 777.547 KiB)
+# see "Usage with Flux" below for `recursive_alloc_arrays` and `infer!`
+aa_model = recursive_alloc_arrays(model)
+infer!(b, predictions, aa_model, alloc_data): 0.113104 seconds (7.69 k allocations: 688.047 KiB)
+# checked example (use for testing)
 checked_alloc_data = CheckedAllocArray.(data)
 infer!(b, predictions, model, checked_alloc_data): 13.721077 seconds (22.54 k allocations: 1.354 MiB)
 ```
 
-We can see in this example, we got 200x less allocation (and no GC time), and similar runtime, for `AllocArray`s. We can see `CheckedAllocArrays` are far slower here.
+We can see in this example, we got 200x less allocation (and no GC time), and similar runtime, for `AllocArray`s. We also can reduce allocations a bit more with `aa_model` than `model`. We see `CheckedAllocArrays` are far slower.
+
+## Usage with Flux
+
+For reducing allocations as much as possible with Flux models, we can use `recursive_alloc_arrays` below to convert a model to use `AllocArray`s. This will convert all arrays in the model to `AllocArray`s, and will also convert any arrays in the model's parameters to `AllocArray`s. This way, any layers during the forward pass of the model which use `similar` calls based on the layer's parameters will use the bump allocator, when the forward pass is invoked within `with_allocator`.
+
+```julia
+using Functors
+
+function recursive_alloc_arrays(obj)
+    return fmap(x -> begin
+        x isa AbstractArray || return x
+        isbitstype(eltype(x)) || return x
+        return AllocArray(x)
+    end, obj; exclude=x -> x isa AbstractArray{<:Number} || x isa Function)
+end
+
+function infer!(b::BumpAllocator, predictions, model, data)
+    # Here we use a locked bumper for thread-safety, since NNlib multithreads
+    # some of it's functions. However we are sure to only deallocate outside of the threaded region. (All concurrency occurs within the `model` call itself).
+    with_allocator(b) do
+        for (idx, x) in enumerate(data)
+            predictions[idx] .= model(x)
+            reset!(b) # reset `b` after each batch
+        end
+    end
+    # don't escape bump-allocated memory!
+    return predictions
+end
+```
+
+The specific function to use here may need to be adjusted depending on the details of the model and Functors.jl. This one is tested in `test/flux.jl` on a simple model.
 
 ## Design notes
 
