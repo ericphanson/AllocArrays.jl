@@ -1,12 +1,10 @@
 using Base: Base.Broadcast
 using Base: Dims
 using Base.Broadcast: Broadcasted, ArrayStyle
-using UnsafeArrays: UnsafeArray
 
 """
-    struct AllocArray{T,N} <: DenseArray{T,N}
-        arr::UnsafeArray{T,N}
-        gcref::Any
+    struct AllocArray{T,N,A<:AbstractArray{T,N}} <: AbstractArray{T,N}
+        arr::A
     end
 
     AllocArray(arr::AbstractArray)
@@ -14,39 +12,20 @@ using UnsafeArrays: UnsafeArray
 Wrapper type which forwards most array methods to the inner array `arr`,
 but dispatches `similar` to special allocation methods.
 
-The inner array `arr` is always represented as an `UnsafeArray`,
-but the field `gcref` may hold a materialized `AbstractArray` corresponding
-to the same data, which is held to preserve a reference to the data to prevent GC.
-This field is never accessed or used, so the `::Any` type does not affect type stability
-of code using AllocArrays.
-
-Use the constructor `AllocArray(arr)` to construct an `AllocArray`. Note that `arr`
-must be able to be represented as an `UnsafeArray`, meaning it must be a bits-type
-and have a pointer. To support `UnitRange` and similar, `collect` it first.
+Use the constructor `AllocArray(arr)` to construct an `AllocArray`.
 
 Typically this constructor is only used at the entrypoint of a larger set of code
 which is expected to use `similar` based on this input for further allocations.
 When inside a `with_allocator` block, `similar` can be dispatched to a
 (dynamically-scoped) bump allocator.
 """
-struct AllocArray{T,N} <: DenseArray{T,N}
-    arr::UnsafeArray{T,N}
-    gcref::Any
-
-    AllocArray(gcref::AbstractArray{T,N}) where {T,N} = AllocArray{T,N}(gcref)
-    function AllocArray{T,N}(gcref::AbstractArray{T,N}) where {T,N}
-        arr = UnsafeArray(pointer(gcref), size(gcref))
-        return new{eltype(arr),ndims(arr)}(arr, gcref)
-    end
-
-    # already allocated with Bumper, no gcref needed
-    AllocArray(arr::UnsafeArray{T,N}) where {T,N} = AllocArray{T,N}(arr)
-    AllocArray{T,N}(arr::UnsafeArray{T,N}) where {T,N} = new{T,N}(arr, nothing)
-
-
-    AllocArray(a::AllocArray) = a
-    AllocArray{T,N}(a::AllocArray{T,N}) where {T,N} = a
+struct AllocArray{T,N,A<:AbstractArray{T,N}} <: AbstractArray{T,N}
+    arr::A
 end
+
+AllocArray(a::AllocArray) = a
+AllocArray{T,N,Arr}(a::AllocArray{T,N}) where {T,N, Arr} = a
+AllocArray{T, N, Arr}(a::AllocArray{T, N, A} where A<:AbstractArray{T, N}) where {T, N, Arr<:AbstractArray{T, N}} = a
 
 AllocMatrix{T} = AllocArray{T,2}
 AllocVector{T} = AllocArray{T,1}
@@ -75,7 +54,7 @@ end
 
 Base.size(a::AllocArray) = size(getfield(a, :arr))
 
-Base.IndexStyle(::Type{<:AllocArray{T,N}}) where {T,N} = Base.IndexStyle(UnsafeArray{T,N})
+Base.IndexStyle(::Type{<:AllocArray{T,N,Arr}}) where {T,N,Arr} = Base.IndexStyle(Arr)
 
 # used only by broadcasting?
 function Base.similar(::Type{<:AllocArray{T}}, dims::Dims) where {T}
@@ -113,7 +92,7 @@ function Base.unsafe_convert(::Type{Ptr{T}}, a::AllocArray) where {T}
     return Base.unsafe_convert(Ptr{T}, getfield(a, :arr))
 end
 
-Base.elsize(::Type{<:AllocArray{T,N}}) where {T,N} = Base.elsize(UnsafeArray{T,N})
+Base.elsize(::Type{<:AllocArray{T,N, Arr}}) where {T,N, Arr} = Base.elsize(Arr)
 
 Base.strides(a::AllocArray) = strides(getfield(a, :arr))
 

@@ -77,5 +77,5 @@ end
 
     @test sprint(showerror, InvalidMemoryException()) == "InvalidMemoryException: Array accessed after its memory has been deallocated."
 
-    @test c.alloc_array.gcref === inner
+    @test Base.parent(c) === inner
 end
