@@ -60,49 +60,58 @@ For a less-toy example, in `test/flux.jl` we test inference over a Flux model:
 
 ```julia
 # Baseline: Array
-infer!(b, predictions, model, data): 0.492020 seconds (6.77 k allocations: 221.508 MiB, 4.57% gc time)
+infer_batches!(b, predictions, model, data): 0.492020 seconds (6.77 k allocations: 221.508 MiB, 4.57% gc time)
 alloc_data = AllocArray.(data)
-infer!(b, predictions, model, alloc_data): 0.326735 seconds (10.09 k allocations: 843.047 KiB)
-# see "Usage with Flux" below for `recursive_alloc_arrays` and `infer!`
-aa_model = recursive_alloc_arrays(model)
-infer!(b, predictions, aa_model, alloc_data): 0.329056 seconds (10.54 k allocations: 855.547 KiB)
+infer_batches!(b, predictions, model, alloc_data): 0.326735 seconds (10.09 k allocations: 843.047 KiB)
+# convert the arrays inside the model itself to be AllocArrays
+aa_model = Adapt.adapt(AllocArray, model)
+infer_batches!(b, predictions, aa_model, alloc_data): 0.329056 seconds (10.54 k allocations: 855.547 KiB)
 # checked example (use for testing)
 checked_alloc_data = CheckedAllocArray.(data)
-infer!(b, predictions, model, checked_alloc_data): 15.190550 seconds (22.61 k allocations: 1.363 MiB)
+infer_batches!(b, predictions, model, checked_alloc_data): 15.190550 seconds (22.61 k allocations: 1.363 MiB)
 ```
 
 We can see in this example, we got 200x less allocation (and no GC time), and similar runtime, for `AllocArray`s. We also can reduce allocations more with `aa_model` than `model` in some cases; not here though. We see `CheckedAllocArrays` are far slower.
 
 ## Usage with Flux
 
-For reducing allocations as much as possible with Flux models, we can use `recursive_alloc_arrays` below to convert a model to use `AllocArray`s. This will convert all arrays in the model to `AllocArray`s, and will also convert any arrays in the model's parameters to `AllocArray`s. This way, any layers during the forward pass of the model which use `similar` calls based on the layer's parameters will use the bump allocator, when the forward pass is invoked within `with_allocator`.
+For reducing allocations as much as possible with Flux models, we can use `Adapt.adapt(AllocArray, model)` to convert a model to use `AllocArray`s. This will convert all arrays in the model to `AllocArray`s, and will also convert any arrays in the model's parameters to `AllocArray`s. This way, any layers during the forward pass of the model which use `similar` calls based on the layer's parameters will use the bump allocator, when the forward pass is invoked within `with_allocator`.
+
+Additionally, we suggest using an `infer_batches!` function similar to the following:
 
 ```julia
-using Functors
-
-function recursive_alloc_arrays(obj)
-    return fmap(x -> begin
-        x isa AbstractArray || return x
-        isbitstype(eltype(x)) || return x
-        return AllocArray(x)
-    end, obj; exclude=x -> x isa AbstractArray{<:Number} || x isa Function)
-end
-
-function infer!(b::BumpAllocator, predictions, model, data)
+function infer_batches!(b::BumperAllocator, predictions, model, batches)
     # Here we use a locked bumper for thread-safety, since NNlib multithreads
-    # some of it's functions. However we are sure to only deallocate outside of the threaded region. (All concurrency occurs within the `model` call itself).
+    # some of it's functions. However we are sure to only deallocate outside of the threaded region.
+    # (All concurrency occurs within the `model` call itself).
     with_allocator(b) do
-        for (idx, x) in enumerate(data)
-            predictions[idx] .= model(x)
+        for (idx, batch) in enumerate(batches)
+            predictions[idx] .= model(AllocArray(batch))
             reset!(b) # reset `b` after each batch
         end
     end
     # don't escape bump-allocated memory!
     return predictions
 end
+
+# or
+
+function infer_batch(b::BumperAllocator, model, batch)
+    with_allocator(b) do
+        # materialize into an `Array` before resetting bump allocator
+        ret = Array(model(AllocArray(batch)))
+        reset!(b)
+        # don't leak bump-allocated memory
+        return ret
+    end
+end
 ```
 
-The specific function to use here may need to be adjusted depending on the details of the model and Functors.jl. This one is tested in `test/flux.jl` on a simple model.
+The key points here are:
+
+* use a `BumperAllocator`, not an `UncheckedBumperAllocator`, since NNlib multithreads computations
+* move the result to non-AllocArrays memory, e.g. with `Array` or by copying into preallocated memory
+* reset the allocator after each batch to not run out of memory inside the bump allocator itself
 
 ## Design notes
 

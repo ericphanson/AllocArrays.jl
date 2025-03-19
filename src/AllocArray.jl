@@ -82,7 +82,10 @@ end
 ##### Adapt.jl
 #####
 
-# Adapt.adapt_structure(to, x::AllocArray) = AllocArray(adapt(to, parent(x)))
+# AllocArrays should be seen as "storage" like CuArray, not a wrapper like Transpose,
+# since we want to recurse through models and convert arrays to AllocArrays, so that
+# in the forward pass we can use our bump allocator
+Adapt.adapt_storage(::Type{<:AllocArray}, xs::AbstractArray) = AllocArray(xs)
 
 #####
 ##### StridedArray interface

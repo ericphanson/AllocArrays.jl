@@ -1,12 +1,4 @@
-using Flux, Random, Functors
-
-function recursive_alloc_arrays(obj)
-    return fmap(x -> begin
-        x isa AbstractArray || return x
-        isbitstype(eltype(x)) || return x
-        return AllocArray(x)
-    end, obj; exclude=x -> x isa AbstractArray{<:Number} || x isa Function)
-end
+using Flux, Random, Adapt
 
 function bumper_run(model, data)
     b = UncheckedBumperAllocator(2^25) # 32 MiB
@@ -88,15 +80,17 @@ end
 # Our model acts on input just by applying the chain.
 (m::DigitsModel)(x) = m.chain(x)
 
-function infer!(b, predictions, model, data)
+function infer_batches!(b::BumperAllocator, predictions, model, batches)
     # Here we use a locked bumper for thread-safety, since NNlib multithreads
-    # some of it's functions. However we are sure to only deallocate outside of the threaded region. (All concurrency occurs within the `model` call itself).
+    # some of it's functions. However we are sure to only deallocate outside of the threaded region.
+    # (All concurrency occurs within the `model` call itself).
     with_allocator(b) do
-        for (idx, x) in enumerate(data)
-            predictions[idx] .= model(x)
+        for (idx, batch) in enumerate(batches)
+            predictions[idx] .= model(batch) # we don't use AllocArray(batch) here since we want to compare with and without AA
             reset!(b) # reset `b` after each batch
         end
     end
+    # don't escape bump-allocated memory!
     return predictions
 end
 
@@ -121,25 +115,25 @@ end
     checked_alloc_data = CheckedAllocArray.(data)
 
     preds_data = fresh_predictions()
-    infer!(b, preds_data, model, data)
+    infer_batches!(b, preds_data, model, data)
 
     preds_alloc = fresh_predictions()
-    infer!(b, preds_alloc, model, alloc_data)
+    infer_batches!(b, preds_alloc, model, alloc_data)
 
     preds_alloc_aa = fresh_predictions()
-    aa_model = recursive_alloc_arrays(model)
-    infer!(b, preds_alloc_aa, aa_model, alloc_data)
+    aa_model = Adapt.adapt(AllocArray, model)
+    infer_batches!(b, preds_alloc_aa, aa_model, alloc_data)
 
     preds_checked_alloc = fresh_predictions()
-    infer!(b, preds_checked_alloc, model, checked_alloc_data)
+    infer_batches!(b, preds_checked_alloc, model, checked_alloc_data)
 
     @test preds_data ≈ preds_alloc
     @test preds_data ≈ preds_alloc_aa
     @test preds_data ≈ preds_checked_alloc
 
     predictions = fresh_predictions()
-    @showtime infer!(b, predictions, model, data);
-    @showtime infer!(b, predictions, model, alloc_data);
-    @showtime infer!(b, predictions, aa_model, alloc_data);
-    @showtime infer!(b, predictions, model, checked_alloc_data);
+    @showtime infer_batches!(b, predictions, model, data);
+    @showtime infer_batches!(b, predictions, model, alloc_data);
+    @showtime infer_batches!(b, predictions, aa_model, alloc_data);
+    @showtime infer_batches!(b, predictions, model, checked_alloc_data);
 end

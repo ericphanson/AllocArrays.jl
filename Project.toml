@@ -1,29 +1,30 @@
 name = "AllocArrays"
 uuid = "5c00bae2-1499-4716-9206-27f63fd08a44"
 authors = ["Eric P. Hanson"]
-version = "0.4.0"
+version = "0.4.1"
 
 [deps]
+Adapt = "79e6a3ab-5dfb-504d-930d-738a2a938a0e"
 Bumper = "8ce10254-0962-460f-a3d8-1f77fea1446e"
 ConcurrentUtilities = "f0e56b4a-5159-44fe-b623-3e5288b988bb"
 PrecompileTools = "aea7be01-6a6a-4083-8856-8a6e6704d82a"
 ScopedValues = "7e506255-f358-4e82-b7e4-beb19740aa63"
 
 [compat]
+Adapt = "4.3.0"
 Aqua = "0.7"
 Bumper = "0.7"
 ConcurrentUtilities = "2.2.1"
-Functors = "0.5.2"
 PrecompileTools = "1.2"
 ScopedValues = "1"
 julia = "1.10"
 
 [extras]
+Adapt = "79e6a3ab-5dfb-504d-930d-738a2a938a0e"
 Aqua = "4c88cf16-eb10-579e-8560-4a9242c79595"
 Flux = "587475ba-b771-5e3f-ad9e-33799f191a9c"
-Functors = "d9f16b24-f501-4c13-a1f2-28368ffc5196"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["Aqua", "Flux", "Functors", "Random", "Test"]
+test = ["Adapt", "Aqua", "Flux", "Random", "Test"]

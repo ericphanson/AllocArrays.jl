@@ -4,6 +4,7 @@ using ScopedValues: ScopedValue, with
 using Bumper
 using ConcurrentUtilities
 using PrecompileTools
+using Adapt: Adapt
 
 # Two array types
 export AllocArray
