@@ -79,12 +79,6 @@ function Base.similar(bc::Broadcasted{ArrayStyle{AllocArray}},
 end
 
 #####
-##### Adapt.jl
-#####
-
-# Adapt.adapt_structure(to, x::AllocArray) = AllocArray(adapt(to, parent(x)))
-
-#####
 ##### StridedArray interface
 #####
 
