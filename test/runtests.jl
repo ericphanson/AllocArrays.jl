@@ -52,4 +52,6 @@ end
     a = AllocArray(collect(1:4))
     @test AllocArray(a).gcref === a.gcref
     @test AllocArray(a).arr === a.arr
+
+    @testset "test gc" include("test_gc.jl")
 end

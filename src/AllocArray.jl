@@ -3,10 +3,12 @@ using Base: Dims
 using Base.Broadcast: Broadcasted, ArrayStyle
 using UnsafeArrays: UnsafeArray
 
+const GC_ROOTS = Base.IdSet()
+const GC_ROOTS_LOCK = ReentrantLock()
+
 """
-    struct AllocArray{T,N} <: DenseArray{T,N}
+    mutable struct AllocArray{T,N} <: DenseArray{T,N}
         arr::UnsafeArray{T,N}
-        gcref::Any
     end
 
     AllocArray(arr::AbstractArray)
@@ -14,11 +16,7 @@ using UnsafeArrays: UnsafeArray
 Wrapper type which forwards most array methods to the inner array `arr`,
 but dispatches `similar` to special allocation methods.
 
-The inner array `arr` is always represented as an `UnsafeArray`,
-but the field `gcref` may hold a materialized `AbstractArray` corresponding
-to the same data, which is held to preserve a reference to the data to prevent GC.
-This field is never accessed or used, so the `::Any` type does not affect type stability
-of code using AllocArrays.
+The inner array `arr` is always represented as an `UnsafeArray`.
 
 Use the constructor `AllocArray(arr)` to construct an `AllocArray`. Note that `arr`
 must be able to be represented as an `UnsafeArray`, meaning it must be a bits-type
@@ -29,19 +27,26 @@ which is expected to use `similar` based on this input for further allocations.
 When inside a `with_allocator` block, `similar` can be dispatched to a
 (dynamically-scoped) bump allocator.
 """
-struct AllocArray{T,N} <: DenseArray{T,N}
-    arr::UnsafeArray{T,N}
-    gcref::Any
+mutable struct AllocArray{T,N} <: DenseArray{T,N}
+    const arr::UnsafeArray{T,N}
 
     AllocArray(gcref::AbstractArray{T,N}) where {T,N} = AllocArray{T,N}(gcref)
     function AllocArray{T,N}(gcref::AbstractArray{T,N}) where {T,N}
         arr = UnsafeArray(pointer(gcref), size(gcref))
-        return new{eltype(arr),ndims(arr)}(arr, gcref)
+        # we need to keep `gcref` rooted for as long as we use `arr`
+        # we will do so by keeping it in a global set and then only removing it
+        # upon finalization of the `AllocArray`
+        @lock GC_ROOTS_LOCK push!(GC_ROOTS, gcref)
+        obj = new{eltype(arr),ndims(arr)}(arr)
+        finalizer((x) -> begin
+            @async @lock GC_ROOTS_LOCK delete!(GC_ROOTS, gcref)
+        end, obj)
+        return obj
     end
 
     # already allocated with Bumper, no gcref needed
     AllocArray(arr::UnsafeArray{T,N}) where {T,N} = AllocArray{T,N}(arr)
-    AllocArray{T,N}(arr::UnsafeArray{T,N}) where {T,N} = new{T,N}(arr, nothing)
+    AllocArray{T,N}(arr::UnsafeArray{T,N}) where {T,N} = new{T,N}(arr)
 
 
     AllocArray(a::AllocArray) = a

@@ -1,7 +1,7 @@
 name = "AllocArrays"
 uuid = "5c00bae2-1499-4716-9206-27f63fd08a44"
 authors = ["Eric P. Hanson"]
-version = "0.3.0"
+version = "0.3.1"
 
 [deps]
 Bumper = "8ce10254-0962-460f-a3d8-1f77fea1446e"
