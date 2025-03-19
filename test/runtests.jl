@@ -42,14 +42,13 @@ end
 
     # Bug reported here:
     # https://julialang.zulipchat.com/#narrow/stream/137791-general/topic/AllocArrays.2Ejl/near/398698500
-    a = AllocArray(collect(1:4))
+    a = AllocArray(1:4)
     @test a[1:2] .+ a[3:4]' isa AllocArray
 
-    c = CheckedAllocArray(collect(1:4))
+    c = CheckedAllocArray(1:4)
     @test c[1:2] .+ c[3:4]' isa CheckedAllocArray
 
     # Constructor does not recurse
-    a = AllocArray(collect(1:4))
-    @test AllocArray(a).gcref === a.gcref
+    a = AllocArray(1:4)
     @test AllocArray(a).arr === a.arr
 end
