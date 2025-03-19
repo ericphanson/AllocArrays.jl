@@ -75,7 +75,7 @@ We can see in this example, we got 200x less allocation (and no GC time), and si
 
 ## Usage with Flux
 
-For reducing allocations as much as possible with Flux models, we can use `Adapt.adapt(AllocArray, model)` to convert a model to use `AllocArray`s. This will convert all arrays in the model to `AllocArray`s, and will also convert any arrays in the model's parameters to `AllocArray`s. This way, any layers during the forward pass of the model which use `similar` calls based on the layer's parameters will use the bump allocator, when the forward pass is invoked within `with_allocator`.
+For reducing allocations as much as possible with Flux models, we can use `Adapt.adapt(AllocArray, model)` to convert a model to use `AllocArray`s (after calling `using Adapt`). This will convert all arrays in the model to `AllocArray`s, and will also convert any arrays in the model's parameters to `AllocArray`s. This way, any layers during the forward pass of the model which use `similar` calls based on the layer's parameters will use the bump allocator, when the forward pass is invoked within `with_allocator`.
 
 Additionally, we suggest using an `infer_batches!` function similar to the following:
 

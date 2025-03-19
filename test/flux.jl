@@ -122,6 +122,10 @@ end
 
     preds_alloc_aa = fresh_predictions()
     aa_model = Adapt.adapt(AllocArray, model)
+
+    # check we've truly `adapt`'d the model to AllocArrays
+    @test aa_model.chain.layers[2].weight isa AllocArray
+    
     infer_batches!(b, preds_alloc_aa, aa_model, alloc_data)
 
     preds_checked_alloc = fresh_predictions()
