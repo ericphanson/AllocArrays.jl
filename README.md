@@ -48,6 +48,7 @@ function bumper_reduction!(b, a)
 end
 
 b = BumperAllocator() # Uses a SlabBuffer which grows as needed
+# b = BumperAllocator(2^24) # alternatively specify fixed bytes size of an AllocBuffer (16 MiB), which may be more performant
 a = AllocArray(arr);
 
 @time bumper_reduction!(b, a) #  0.205106 seconds (893.40 k allocations: 44.941 MiB, 2.62% gc time, 99.67% compilation time)
@@ -116,6 +117,9 @@ The key points here are:
 ## Design notes
 
 The user is responsible for constructing buffers (via `AllocBuffer` or the constructors `BumperAllocator` and `UncheckedBumperAllocator`) and for resetting them (`reset!`).
+`BumperAllocator()` is backed by a growable `SlabBuffer`. To set a fixed buffer, which may be more performant,
+use `BumperAllocator(bytes)`.
+
 No implicit buffers are used, and `reset!` is never called in the package. These choices are deliberate: the caller must construct the buffer, pass it to AllocArrays.jl to be used when appropriate, and reset it when they are done.
 
 In particular, the caller must:
