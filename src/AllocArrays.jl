@@ -27,7 +27,7 @@ const CURRENT_ALLOCATOR = ScopedValue{Allocator}(DEFAULT_ALLOCATOR)
 # PrecompileTools workload
 @setup_workload begin
     @compile_workload begin
-        b = BumperAllocator(2^10) # 1 KiB
+        b = BumperAllocator()
         a = AllocArray([1])
         c = CheckedAllocArray(a, MemValid(true))
         with_allocator(b) do

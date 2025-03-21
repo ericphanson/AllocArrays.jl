@@ -15,7 +15,7 @@ function basic_reduction(a)
 end
 
 function bumper_reduction(a)
-    b = BumperAllocator(2^24) # 16 MiB
+    b = BumperAllocator()
     with_allocator(b) do
         ret = basic_reduction(a)
         reset!(b)

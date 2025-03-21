@@ -1,5 +1,5 @@
 function checked_bumper_run(model, data)
-    b = BumperAllocator(2^25) # 32 MiB
+    b = BumperAllocator()
     # should be safe here because we don't allocate concurrently
     with_allocator(b) do
         result = sum(model, data)
@@ -24,18 +24,20 @@ end
 
 @testset "basic escape" begin
     input = CheckedAllocArray([1.0])
-    b = BumperAllocator(2^23) # 8 MiB
-    y = with_allocator(b) do
-        y = similar(input)
-        y .= 2
-        reset!(b)
-        return y
+    @testset "bytes: $bytes" for bytes in (2^23, 0) # (8 MiB, SlabBuffer)
+        b = BumperAllocator(bytes)
+        y = with_allocator(b) do
+            y = similar(input)
+            y .= 2
+            reset!(b)
+            return y
+        end
+        @test_throws InvalidMemoryException y[1]
     end
-    @test_throws InvalidMemoryException y[1]
 end
 
 function bad_function_1(a)
-    b = BumperAllocator(2^23) # 8 MiB
+    b = BumperAllocator()
     output = []
     with_allocator(b) do
         result = some_allocating_function(a)
@@ -46,7 +48,7 @@ function bad_function_1(a)
 end
 
 function bad_function_2(a)
-    b = BumperAllocator(2^23) # 8 MiB
+    b = BumperAllocator()
     output = Channel(Inf)
     with_allocator(b) do
         @sync for _ = 1:10

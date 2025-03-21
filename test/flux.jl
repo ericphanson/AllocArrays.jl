@@ -1,7 +1,7 @@
 using Flux, Random, Adapt
 
 function bumper_run(model, data)
-    b = UncheckedBumperAllocator(2^25) # 32 MiB
+    b = UncheckedBumperAllocator()
     # should be safe here because we don't allocate concurrently
     with_allocator(b) do
         result = sum(model, data)
@@ -97,47 +97,49 @@ end
 @testset "More complicated model" begin
     model = DigitsModel()
 
-    b = BumperAllocator(2^26) # 64 MiB
+    @testset "bytes: $bytes" for bytes in (2^26, 0) # (64 MiB, SlabBuffer)
+        b = BumperAllocator(bytes)
 
-    # Setup some fake data
-    N = 1_000
-    data_arr = rand(Float32, 28, 28, N)
+        # Setup some fake data
+        N = 1_000
+        data_arr = rand(Float32, 28, 28, N)
 
-    # Partition into batches of size 32
-    batch_size = 32
-    data = [reshape(data_arr[:, :, I], 28, 28, 1, :)
-            for I in Iterators.partition(1:N, batch_size)]
+        # Partition into batches of size 32
+        batch_size = 32
+        data = [reshape(data_arr[:, :, I], 28, 28, 1, :)
+                for I in Iterators.partition(1:N, batch_size)]
 
-    n_class = 10
-    fresh_predictions() = [Matrix{Float32}(undef, n_class, size(x, 4)) for x in data]
+        n_class = 10
+        fresh_predictions() = [Matrix{Float32}(undef, n_class, size(x, 4)) for x in data]
 
-    alloc_data = AllocArray.(data)
-    checked_alloc_data = CheckedAllocArray.(data)
+        alloc_data = AllocArray.(data)
+        checked_alloc_data = CheckedAllocArray.(data)
 
-    preds_data = fresh_predictions()
-    infer_batches!(b, preds_data, model, data)
+        preds_data = fresh_predictions()
+        infer_batches!(b, preds_data, model, data)
 
-    preds_alloc = fresh_predictions()
-    infer_batches!(b, preds_alloc, model, alloc_data)
+        preds_alloc = fresh_predictions()
+        infer_batches!(b, preds_alloc, model, alloc_data)
 
-    preds_alloc_aa = fresh_predictions()
-    aa_model = Adapt.adapt(AllocArray, model)
+        preds_alloc_aa = fresh_predictions()
+        aa_model = Adapt.adapt(AllocArray, model)
 
-    # check we've truly `adapt`'d the model to AllocArrays
-    @test aa_model.chain.layers[2].weight isa AllocArray
-    
-    infer_batches!(b, preds_alloc_aa, aa_model, alloc_data)
+        # check we've truly `adapt`'d the model to AllocArrays
+        @test aa_model.chain.layers[2].weight isa AllocArray
 
-    preds_checked_alloc = fresh_predictions()
-    infer_batches!(b, preds_checked_alloc, model, checked_alloc_data)
+        infer_batches!(b, preds_alloc_aa, aa_model, alloc_data)
 
-    @test preds_data ≈ preds_alloc
-    @test preds_data ≈ preds_alloc_aa
-    @test preds_data ≈ preds_checked_alloc
+        preds_checked_alloc = fresh_predictions()
+        infer_batches!(b, preds_checked_alloc, model, checked_alloc_data)
 
-    predictions = fresh_predictions()
-    @showtime infer_batches!(b, predictions, model, data);
-    @showtime infer_batches!(b, predictions, model, alloc_data);
-    @showtime infer_batches!(b, predictions, aa_model, alloc_data);
-    @showtime infer_batches!(b, predictions, model, checked_alloc_data);
+        @test preds_data ≈ preds_alloc
+        @test preds_data ≈ preds_alloc_aa
+        @test preds_data ≈ preds_checked_alloc
+
+        predictions = fresh_predictions()
+        @showtime infer_batches!(b, predictions, model, data);
+        @showtime infer_batches!(b, predictions, model, alloc_data);
+        @showtime infer_batches!(b, predictions, aa_model, alloc_data);
+        @showtime infer_batches!(b, predictions, model, checked_alloc_data);
+    end
 end

@@ -47,7 +47,7 @@ function bumper_reduction!(b, a)
     end
 end
 
-b = BumperAllocator(2^24) # 16 MiB
+b = BumperAllocator() # Uses a SlabBuffer which grows as needed
 a = AllocArray(arr);
 
 @time bumper_reduction!(b, a) #  0.205106 seconds (893.40 k allocations: 44.941 MiB, 2.62% gc time, 99.67% compilation time)
