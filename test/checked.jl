@@ -24,8 +24,8 @@ end
 
 @testset "basic escape" begin
     input = CheckedAllocArray([1.0])
-    @testset "bytes: $bytes" for bytes in (2^23, 0) # (8 MiB, SlabBuffer)
-        b = BumperAllocator(bytes)
+    for alloc in (Returns(BumperAllocator(2^23)), Returns(BumperAllocator())) # (8 MiB, SlabBuffer)
+        b = alloc()
         y = with_allocator(b) do
             y = similar(input)
             y .= 2

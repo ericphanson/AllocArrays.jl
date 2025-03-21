@@ -109,12 +109,13 @@ struct UncheckedBumperAllocator{B<:Union{AllocBuffer,SlabBuffer}} <: Allocator
 end
 
 """
-    UncheckedBumperAllocator(n_bytes::Int = 0)
+    UncheckedBumperAllocator() -> UncheckedBumperAllocator(SlabBuffer())
+    UncheckedBumperAllocator(n_bytes::Int) -> UncheckedBumperAllocator(AllocBuffer(n_bytes))
 
-If `0` (default) equivalent to `UncheckedBumperAllocator(SlabBuffer(n_bytes))`,
-otherwise `UncheckedBumperAllocator(AllocBuffer(n_bytes))`.
+By default uses a growable `SlabBuffer`, or a `AllocBuffer` of `n_bytes` if provided.
 """
-UncheckedBumperAllocator(n_bytes::Int = 0) = UncheckedBumperAllocator(n_bytes == 0 ? SlabBuffer() : AllocBuffer(n_bytes))
+UncheckedBumperAllocator() = UncheckedBumperAllocator(SlabBuffer())
+UncheckedBumperAllocator(n_bytes::Int) = UncheckedBumperAllocator(AllocBuffer(n_bytes))
 
 """
     reset!(B::UncheckedBumperAllocator)
@@ -210,12 +211,13 @@ function BumperAllocator(B::T) where T <: Union{AllocBuffer, SlabBuffer}
 end
 
 """
-    BumperAllocator(n_bytes::Int = 0)
+    BumperAllocator() -> BumperAllocator(SlabBuffer())
+    BumperAllocator(n_bytes::Int) -> BumperAllocator(AllocBuffer(n_bytes))
 
-If `0` (default) equivalent to `BumperAllocator(SlabBuffer(n_bytes))`,
-otherwise `BumperAllocator(AllocBuffer(n_bytes))`.
+By default uses a growable `SlabBuffer`, or a `AllocBuffer` of `n_bytes` if provided.
 """
-BumperAllocator(n_bytes::Int = 0) = BumperAllocator(n_bytes == 0 ? SlabBuffer() : AllocBuffer(n_bytes))
+BumperAllocator() = BumperAllocator(SlabBuffer())
+BumperAllocator(n_bytes::Int) = BumperAllocator(AllocBuffer(n_bytes))
 
 Base.lock(B::BumperAllocator) = lock(B.lock)
 Base.unlock(B::BumperAllocator) = unlock(B.lock)

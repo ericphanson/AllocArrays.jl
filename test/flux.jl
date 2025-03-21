@@ -97,8 +97,8 @@ end
 @testset "More complicated model" begin
     model = DigitsModel()
 
-    @testset "bytes: $bytes" for bytes in (2^26, 0) # (64 MiB, SlabBuffer)
-        b = BumperAllocator(bytes)
+    for alloc in (Returns(BumperAllocator(2^26)), Returns(BumperAllocator())) # (64 MiB, SlabBuffer)
+        b = alloc()
 
         # Setup some fake data
         N = 1_000
