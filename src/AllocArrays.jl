@@ -29,7 +29,7 @@ const CURRENT_ALLOCATOR = ScopedValue{Allocator}(DEFAULT_ALLOCATOR)
     @compile_workload begin
         for alloc in (() -> BumperAllocator(), () -> BumperAllocator(2^10)) # (SlabBuffer, 1 KiB)
             b = alloc()
-            a = AllocArray([1])
+            a = AllocArray([1.0f0])
             c = CheckedAllocArray(a, MemValid(true))
             with_allocator(b) do
                 similar(a) .= 1
