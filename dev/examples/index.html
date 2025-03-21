@@ -9,7 +9,7 @@
            (; b, c) = some_allocating_function(a)
            return sum(b .+ c)
        end</code><code class="nohighlight hljs ansi" style="display:block;">basic_reduction (generic function with 1 method)</code></pre><h3 id="Wrong:-allowing-escapes"><a class="docs-heading-anchor" href="#Wrong:-allowing-escapes">Wrong: allowing escapes</a><a id="Wrong:-allowing-escapes-1"></a><a class="docs-heading-anchor-permalink" href="#Wrong:-allowing-escapes" title="Permalink"></a></h3><p>Allocations inside <code>@no_escape</code> must not escape!</p><pre><code class="language-julia-repl hljs" style="display:block;">julia&gt; function bad_function_1(a)
-           b = BumperAllocator(2^25) # 32 MiB
+           b = BumperAllocator()
            output = []
            with_allocator(b) do
                result = some_allocating_function(a)
@@ -18,7 +18,7 @@
            end
            return sum(output...)
        end</code><code class="nohighlight hljs ansi" style="display:block;">bad_function_1 (generic function with 1 method)</code><br/><code class="language-julia-repl hljs" style="display:block;">julia&gt; bad_function_1(CheckedAllocArray([1]))</code><code class="nohighlight hljs ansi" style="display:block;">ERROR: InvalidMemoryException: Array accessed after its memory has been deallocated.</code></pre><p>Here is a corrected version:</p><pre><code class="language-julia-repl hljs" style="display:block;">julia&gt; function good_function_1(a)
-           b = BumperAllocator(2^25) # 32 MiB
+           b = BumperAllocator()
        
            # note, we are not inside `with_allocator`, so we are not making buffer-backed memory
            output = similar(a)
@@ -30,7 +30,7 @@
            end
            return sum(output)
        end</code><code class="nohighlight hljs ansi" style="display:block;">good_function_1 (generic function with 1 method)</code><br/><code class="language-julia-repl hljs" style="display:block;">julia&gt; good_function_1(AllocArray([1]))</code><code class="nohighlight hljs ansi" style="display:block;">1</code></pre><h3 id="Wrong:-resetting-a-buffer-in-active-use"><a class="docs-heading-anchor" href="#Wrong:-resetting-a-buffer-in-active-use">Wrong: resetting a buffer in active use</a><a id="Wrong:-resetting-a-buffer-in-active-use-1"></a><a class="docs-heading-anchor-permalink" href="#Wrong:-resetting-a-buffer-in-active-use" title="Permalink"></a></h3><pre><code class="language-julia-repl hljs" style="display:block;">julia&gt; function bad_function_2(a)
-           b = BumperAllocator(2^25) # 32 MiB
+           b = BumperAllocator()
            output = Channel(Inf)
            with_allocator(b) do
                @sync for _ = 1:10
@@ -44,7 +44,7 @@
            close(output)
            return sum(collect(output))
        end</code><code class="nohighlight hljs ansi" style="display:block;">bad_function_2 (generic function with 1 method)</code><br/><code class="language-julia-repl hljs" style="display:block;">julia&gt; bad_function_2(CheckedAllocArray([1]))</code><code class="nohighlight hljs ansi" style="display:block;">20</code></pre><p>Here is a corrected version:</p><pre><code class="language-julia-repl hljs" style="display:block;">julia&gt; function good_function_2(a)
-           b = BumperAllocator(2^25) # 32 MiB
+           b = BumperAllocator()
            output = Channel(Inf)
            with_allocator(b) do
                @sync for _ = 1:10
@@ -58,7 +58,7 @@
            close(output)
            return sum(collect(output))
        end</code><code class="nohighlight hljs ansi" style="display:block;">good_function_2 (generic function with 1 method)</code><br/><code class="language-julia-repl hljs" style="display:block;">julia&gt; good_function_2(AllocArray([1]))</code><code class="nohighlight hljs ansi" style="display:block;">20</code></pre><p>Or, if we need to reset multiple times as we process the data, we could do a serial version:</p><pre><code class="language-julia-repl hljs" style="display:block;">julia&gt; function good_function_2b(a)
-           b = BumperAllocator(2^25) # 32 MiB
+           b = BumperAllocator()
            output = Channel(Inf)
            with_allocator(b) do
                for _ = 1:10
@@ -70,7 +70,7 @@
            close(output)
            return sum(collect(output))
        end</code><code class="nohighlight hljs ansi" style="display:block;">good_function_2b (generic function with 1 method)</code><br/><code class="language-julia-repl hljs" style="display:block;">julia&gt; good_function_2b(AllocArray([1]))</code><code class="nohighlight hljs ansi" style="display:block;">20</code></pre><p>We could also do something in-between, by launching tasks in batches of <code>n</code>, then resetting the buffer between them. Or we could use multiple buffers.</p><h3 id="Wrong:-neglecting-to-reset-the-buffer"><a class="docs-heading-anchor" href="#Wrong:-neglecting-to-reset-the-buffer">Wrong: neglecting to reset the buffer</a><a id="Wrong:-neglecting-to-reset-the-buffer-1"></a><a class="docs-heading-anchor-permalink" href="#Wrong:-neglecting-to-reset-the-buffer" title="Permalink"></a></h3><p>As shown above, we must be careful about when we reset the buffer. However, if we never reset it (analogous to never garbage collecting), we run into another problem which is we will run out memory!</p><pre><code class="language-julia hljs">function bad_function_3(a, N)
-    b = BumperAllocator(2^25) # 32 MiB
+    b = BumperAllocator()
     output = Channel(Inf)
     with_allocator(b) do
         for _ = 1:N # bad! we are going to allocate `N` times without resetting!
@@ -81,4 +81,4 @@
     end
     close(output)
     return sum(collect(output))
-end</code></pre><p>This can be fixed by resetting appropriately, as in e.g. <code>good_function_2b</code> above.</p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../">« Home</a><a class="docs-footer-nextpage" href="../interface/">Allocator interface »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.9.0 on <span class="colophon-date" title="Wednesday 19 March 2025 23:24">Wednesday 19 March 2025</span>. Using Julia version 1.10.9.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+end</code></pre><p>This can be fixed by resetting appropriately, as in e.g. <code>good_function_2b</code> above.</p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../">« Home</a><a class="docs-footer-nextpage" href="../interface/">Allocator interface »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.9.0 on <span class="colophon-date" title="Friday 21 March 2025 17:46">Friday 21 March 2025</span>. Using Julia version 1.10.9.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
