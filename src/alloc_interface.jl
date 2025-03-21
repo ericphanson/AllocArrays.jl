@@ -68,7 +68,7 @@ end
 # Naive use of Bumper.jl
 
 """
-    UncheckedBumperAllocator(b::AllocBuffer)
+    UncheckedBumperAllocator(b::Union{AllocBuffer,SlabBuffer})
 
 Use with [`with_allocator`](@ref) to dispatch `similar` calls
 for [`AllocArray`](@ref)s to allocate using the buffer `b`,
@@ -104,15 +104,17 @@ end
 12
 ```
 """
-struct UncheckedBumperAllocator{B<:AllocBuffer} <: Allocator
+struct UncheckedBumperAllocator{B<:Union{AllocBuffer,SlabBuffer}} <: Allocator
     buf::B
 end
 
 """
-    UncheckedBumperAllocator(n_bytes::Int)
+    UncheckedBumperAllocator() -> UncheckedBumperAllocator(SlabBuffer())
+    UncheckedBumperAllocator(n_bytes::Int) -> UncheckedBumperAllocator(AllocBuffer(n_bytes))
 
-Shorthand for `UncheckedBumperAllocator(AllocBuffer(n_bytes))`.
+By default uses a growable `SlabBuffer`, or a `AllocBuffer` of `n_bytes` if provided.
 """
+UncheckedBumperAllocator() = UncheckedBumperAllocator(SlabBuffer())
 UncheckedBumperAllocator(n_bytes::Int) = UncheckedBumperAllocator(AllocBuffer(n_bytes))
 
 """
@@ -158,7 +160,7 @@ end
 #   - every access to a `CheckedAllocArray` uses a read-lock to `MemValid` to ensure the memory is still valid
 
 """
-    BumperAllocator(b::AllocBuffer)
+    BumperAllocator(b::Union{AllocBuffer,SlabBuffer})
 
 Use with [`with_allocator`](@ref) to dispatch `similar` calls
 for [`AllocArray`](@ref)s and [`CheckedAllocArray`](@ref)s
@@ -204,15 +206,17 @@ struct BumperAllocator{B} <: Allocator
     lock::ReentrantLock
 end
 
-function BumperAllocator(B::AllocBuffer)
+function BumperAllocator(B::T) where T <: Union{AllocBuffer, SlabBuffer}
     return BumperAllocator(UncheckedBumperAllocator(B), MemValid[], ReentrantLock())
 end
 
 """
-    BumperAllocator(n_bytes::Int)
+    BumperAllocator() -> BumperAllocator(SlabBuffer())
+    BumperAllocator(n_bytes::Int) -> BumperAllocator(AllocBuffer(n_bytes))
 
-Shorthand for `BumperAllocator(AllocBuffer(n_bytes))`.
+By default uses a growable `SlabBuffer`, or a `AllocBuffer` of `n_bytes` if provided.
 """
+BumperAllocator() = BumperAllocator(SlabBuffer())
 BumperAllocator(n_bytes::Int) = BumperAllocator(AllocBuffer(n_bytes))
 
 Base.lock(B::BumperAllocator) = lock(B.lock)

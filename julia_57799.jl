@@ -9,7 +9,7 @@ function mycopy(dest, src, iter)
     return dest
 end
 
-b = BumperAllocator(2^30);
+b = BumperAllocator();
 arr = rand(Float32, 50000000);
 arr2 = similar(arr);
 a = AllocArray(arr);
