@@ -27,7 +27,7 @@ const CURRENT_ALLOCATOR = ScopedValue{Allocator}(DEFAULT_ALLOCATOR)
 # PrecompileTools workload
 @setup_workload begin
     @compile_workload begin
-        for alloc in (Returns(BumperAllocator()), Returns(BumperAllocator(2^10))) # (SlabBuffer, 1 KiB)
+        for alloc in (() -> BumperAllocator(), () -> BumperAllocator(2^10)) # (SlabBuffer, 1 KiB)
             b = alloc()
             a = AllocArray([1])
             c = CheckedAllocArray(a, MemValid(true))
