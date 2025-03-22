@@ -68,7 +68,7 @@ end
 # Naive use of Bumper.jl
 
 """
-    UncheckedBumperAllocator(b::Union{AllocBuffer,SlabBuffer})
+    UncheckedBumperAllocator(b::Union{AllocBuffer,SlabBuffer,...})
 
 Use with [`with_allocator`](@ref) to dispatch `similar` calls
 for [`AllocArray`](@ref)s to allocate using the buffer `b`,
@@ -104,7 +104,7 @@ end
 12
 ```
 """
-struct UncheckedBumperAllocator{B<:Union{AllocBuffer,SlabBuffer}} <: Allocator
+struct UncheckedBumperAllocator{B} <: Allocator
     buf::B
 end
 
@@ -206,8 +206,8 @@ struct BumperAllocator{B} <: Allocator
     lock::ReentrantLock
 end
 
-function BumperAllocator(B::T) where T <: Union{AllocBuffer, SlabBuffer}
-    return BumperAllocator(UncheckedBumperAllocator(B), MemValid[], ReentrantLock())
+function BumperAllocator(b)
+    return BumperAllocator(UncheckedBumperAllocator(b), MemValid[], ReentrantLock())
 end
 
 """
