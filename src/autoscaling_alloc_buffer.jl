@@ -16,7 +16,7 @@ end
                            max_history_size=$DEFAULT_HISTORY_SIZE,
                            desired_max_buffers=$DEFAULT_DESIRED_MAX_BUFFERS)
 
-Construct a `AutoscalingAllocBuffer`. This constructs an `AllocBuffer` of size `new_buffer_size`. If an allocation (of some size `allocation_size`) is requested and there is not enough space, it will allocate a new buffer of size `max(sz, 2*allocation_size)`, and set the internal `new_buffer_size` parameter to that amount. Thus, over the course of the run, additional buffers will be allocated as necessary, the size of which will adapt to the allocations incoming.
+Construct a `AutoscalingAllocBuffer`. This constructs an `AllocBuffer` of size `new_buffer_size`. If an allocation (of some size `allocation_size`) is requested and there is not enough space, it will allocate a new buffer of size `max(new_buffer_size, 2*allocation_size)`, and set the internal `new_buffer_size` parameter to that amount. Thus, over the course of the run, additional buffers will be allocated as necessary, the size of which will adapt to the allocations incoming.
 
 When `reset_buffer!` is called, if there are more than `desired_max_buffers` buffers, a new main buffer will be created, whose size is the maximum of the amount of actual space used in all buffers (times 1.1) and the
 maximum of the previous main buffer sizes (stored in the history, which stores the last `max_history_size` sizes).
