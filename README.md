@@ -4,9 +4,11 @@
 [![Coverage](https://codecov.io/gh/ericphanson/AllocArrays.jl/branch/main/graph/badge.svg)](https://codecov.io/gh/ericphanson/AllocArrays.jl)
 [![](https://img.shields.io/badge/docs-dev-blue.svg)](https://ericphanson.github.io/AllocArrays.jl/dev/)
 
-Prototype that attempts to allow usage of [Bumper.jl](https://github.com/MasonProtter/Bumper.jl) (or potentially other allocation strategies) through code that doesn't know about Bumper.
+Provides an array type that allows dispatching to a custom allocator rather than using Julia's built-in GC. This allows using allocators following [Bumper.jl](https://github.com/MasonProtter/Bumper.jl)'s interface through code that doesn't know about Bumper.
 
-This is accomplished by creating a wrapper type `AllocArray` which dispatches `similar` dynamically to an allocator depending on the contextual scope (using [ScopedValues.jl](https://github.com/vchuravy/ScopedValues.jl)).
+In particular, AllocArrays.jl provides a wrapper type `AllocArray` which dispatches `similar` dynamically to an allocator depending on the contextual scope (using [ScopedValues.jl](https://github.com/vchuravy/ScopedValues.jl)).
+
+This can reduce allocations dramatically and provide (small to moderate) speedups for code of a particular structure: code which allocates a lot of intermediate arrays using `similar` (potentially deep in library-code outside of the user's control) repeatedly in some kind of loop the user controls (in which they can insert a call to `reset_buffer!`). This is common in CPU inference for machine learning models, and is used in [ObjectDetector.jl](https://github.com/r3tex/ObjectDetector.jl) by default (as of March 2025), but may also be useful in other contexts.
 
 This package also provides a much safer `CheckedAllocArray` which keeps track of the validity
 of each allocated array, to provide an error in case of access to an invalid array. This
@@ -78,25 +80,9 @@ We can see in this example, we got 200x less allocation (and no GC time), and si
 
 For reducing allocations as much as possible with Flux models, we can use `Adapt.adapt(AllocArray, model)` to convert a model to use `AllocArray`s (after calling `using Adapt`). This will convert all arrays in the model to `AllocArray`s, and will also convert any arrays in the model's parameters to `AllocArray`s. This way, any layers during the forward pass of the model which use `similar` calls based on the layer's parameters will use the bump allocator, when the forward pass is invoked within `with_allocator`.
 
-Additionally, we suggest using an `infer_batches!` function similar to the following:
+Additionally, we suggest using a `infer_batch` function similar to the following:
 
 ```julia
-function infer_batches!(b::BumperAllocator, predictions, model, batches)
-    # Here we use a locked bumper for thread-safety, since NNlib multithreads
-    # some of it's functions. However we are sure to only deallocate outside of the threaded region.
-    # (All concurrency occurs within the `model` call itself).
-    with_allocator(b) do
-        for (idx, batch) in enumerate(batches)
-            predictions[idx] .= model(AllocArray(batch))
-            reset!(b) # reset `b` after each batch
-        end
-    end
-    # don't escape bump-allocated memory!
-    return predictions
-end
-
-# or
-
 function infer_batch(b::BumperAllocator, model, batch)
     with_allocator(b) do
         # materialize into an `Array` before resetting bump allocator
@@ -106,21 +92,41 @@ function infer_batch(b::BumperAllocator, model, batch)
         return ret
     end
 end
+
+# or, given a callable `model`, you can wrap it to obtain another callable model
+# which uses AllocArrays automatically:
+function wrap_model(model; allocator = BumpAllocator(), T=AllocArray)
+    model_aa = Adapt.adapt(T, model)
+    # return a closure over `model_aa` and `allocator`:
+    (inputs...; kw...) -> begin
+        with_allocator(allocator) do
+            try
+                inputs = Adapt.adapt(T, args)
+                ret = Array(model_aa(inputs...; kw...))
+                return ret
+            finally
+                reset!(allocator)
+            end
+        end
+    end
+end
+
+# wrapped_model = wrap_model(model)
+# wrapped_model(batch) # -> results
 ```
 
 The key points here are:
 
 * use a `BumperAllocator`, not an `UncheckedBumperAllocator`, since NNlib multithreads computations
 * move the result to non-AllocArrays memory, e.g. with `Array` or by copying into preallocated memory
-* reset the allocator after each batch to not run out of memory inside the bump allocator itself
+* reset the allocator after each batch to reuse the memory instead of growing the allocator indefinitely
 
 ## Design notes
 
 The user is responsible for constructing buffers (via `AllocBuffer` or the constructors `BumperAllocator` and `UncheckedBumperAllocator`) and for resetting them (`reset!`).
-`BumperAllocator()` is backed by a growable `AutoscalingAllocBuffer`. To set a fixed buffer, which may be more performant,
-use `BumperAllocator(bytes)`.
+`BumperAllocator()` is backed by a growable `AutoscalingAllocBuffer`. To set a fixed buffer, which may be more performant, use `BumperAllocator(bytes)`.
 
-No implicit buffers are used, and `reset!` is never called in the package. These choices are deliberate: the caller must construct the buffer, pass it to AllocArrays.jl to be used when appropriate, and reset it when they are done.
+No implicit buffers are used (e.g. Bumper's `default_buffer()`), and `reset_buffer!` is never called in the package. These choices are deliberate: the caller must construct the buffer, pass it to AllocArrays.jl to be used when appropriate, and reset it when they are done.
 
 In particular, the caller must:
 - ...not reset a buffer in active use. E.g., do not call `reset!` on a buffer that may be used by another task
