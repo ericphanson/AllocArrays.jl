@@ -22,6 +22,10 @@ This means:
 - `AutoscalingAllocBuffer` does not run out of memory (unlike `AllocBuffer`), since new memory will allocated on-demand when necessary
 - for repeated runs of the same size, a single contiguous buffer will be used, which should approximately match the performance of a tuned `AllocBuffer`
 - `AutoscalingAllocBuffer` can reuse allocated memory between runs like `AllocBuffer`, but without potentially OOMing like `AutoscalingAllocBuffer`. Additionally, `AutoscalingAllocBuffer` separately tracks the memory used by the main buffer vs the additional buffers allocated dynamically, so small unexpected additional allocations don't double the memory consumption (unlike a second slab being allocated).
+
+
+!!! note
+    The default `initial_buffer_size` and `max_history_size` are subject to change in non-breaking releases of AllocArrays.jl in order to tune performance in common cases. Additionally, the internal heuristics likewise may change.
 """
 function AutoscalingAllocBuffer(sz::Int=DEFAULT_INITIAL_BUFFER_SIZE;
                                 max_history_size=DEFAULT_HISTORY_SIZE)
