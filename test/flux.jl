@@ -97,7 +97,7 @@ end
 @testset "More complicated model" begin
     model = DigitsModel()
 
-    for alloc in (() -> BumperAllocator(2^26), () -> BumperAllocator()) # (64 MiB, SlabBuffer)
+    for alloc in (() -> BumperAllocator(2^26), () -> BumperAllocator()) # (64 MiB, AutoscalingAllocBuffer)
         b = alloc()
 
         # Setup some fake data

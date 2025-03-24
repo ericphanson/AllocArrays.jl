@@ -33,3 +33,11 @@ UncheckedBumperAllocator
 ```@docs
 AllocArrays.DefaultAllocator
 ```
+
+### Buffers
+
+Here we provide `AutoscalingAllocBuffer` which is used by `BumperAllocator` by default. This builds upon Bumper.jl's `AllocBuffer` to grow as needed.
+
+```@docs
+AutoscalingAllocBuffer
+```

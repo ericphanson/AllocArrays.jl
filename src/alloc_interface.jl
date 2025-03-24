@@ -68,7 +68,7 @@ end
 # Naive use of Bumper.jl
 
 """
-    UncheckedBumperAllocator(b::Union{AllocBuffer,SlabBuffer,...})
+    UncheckedBumperAllocator(b)
 
 Use with [`with_allocator`](@ref) to dispatch `similar` calls
 for [`AllocArray`](@ref)s to allocate using the buffer `b`,
@@ -109,12 +109,12 @@ struct UncheckedBumperAllocator{B} <: Allocator
 end
 
 """
-    UncheckedBumperAllocator() -> UncheckedBumperAllocator(SlabBuffer())
+    UncheckedBumperAllocator() -> UncheckedBumperAllocator(AutoscalingAllocBuffer())
     UncheckedBumperAllocator(n_bytes::Int) -> UncheckedBumperAllocator(AllocBuffer(n_bytes))
 
-By default uses a growable `SlabBuffer`, or a `AllocBuffer` of `n_bytes` if provided.
+By default uses a growable `AutoscalingAllocBuffer`, or a `AllocBuffer` of `n_bytes` if provided.
 """
-UncheckedBumperAllocator() = UncheckedBumperAllocator(SlabBuffer())
+UncheckedBumperAllocator() = UncheckedBumperAllocator(AutoscalingAllocBuffer())
 UncheckedBumperAllocator(n_bytes::Int) = UncheckedBumperAllocator(AllocBuffer(n_bytes))
 
 """
@@ -160,7 +160,7 @@ end
 #   - every access to a `CheckedAllocArray` uses a read-lock to `MemValid` to ensure the memory is still valid
 
 """
-    BumperAllocator(b::Union{AllocBuffer,SlabBuffer})
+    BumperAllocator(b)
 
 Use with [`with_allocator`](@ref) to dispatch `similar` calls
 for [`AllocArray`](@ref)s and [`CheckedAllocArray`](@ref)s
@@ -211,12 +211,12 @@ function BumperAllocator(b)
 end
 
 """
-    BumperAllocator() -> BumperAllocator(SlabBuffer())
+    BumperAllocator() -> BumperAllocator(AutoscalingAllocBuffer())
     BumperAllocator(n_bytes::Int) -> BumperAllocator(AllocBuffer(n_bytes))
 
-By default uses a growable `SlabBuffer`, or a `AllocBuffer` of `n_bytes` if provided.
+By default uses a growable `AutoscalingAllocBuffer`, or a `AllocBuffer` of `n_bytes` if provided.
 """
-BumperAllocator() = BumperAllocator(SlabBuffer())
+BumperAllocator() = BumperAllocator(AutoscalingAllocBuffer())
 BumperAllocator(n_bytes::Int) = BumperAllocator(AllocBuffer(n_bytes))
 
 Base.lock(B::BumperAllocator) = lock(B.lock)
