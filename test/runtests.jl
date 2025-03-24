@@ -39,6 +39,7 @@ end
 
     include("flux.jl")
     include("checked.jl")
+    include("autoscaling_alloc_buffer.jl")
 
     # Bug reported here:
     # https://julialang.zulipchat.com/#narrow/stream/137791-general/topic/AllocArrays.2Ejl/near/398698500
