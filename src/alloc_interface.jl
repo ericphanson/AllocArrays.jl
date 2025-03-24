@@ -112,7 +112,13 @@ end
     UncheckedBumperAllocator() -> UncheckedBumperAllocator(AutoscalingAllocBuffer())
     UncheckedBumperAllocator(n_bytes::Int) -> UncheckedBumperAllocator(AllocBuffer(n_bytes))
 
-By default uses a growable `AutoscalingAllocBuffer`, or a `AllocBuffer` of `n_bytes` if provided.
+By default uses a growable [`AutoscalingAllocBuffer`](@ref) (currently), or a `AllocBuffer` of `n_bytes` if provided.
+
+!!! note
+    The default allocator used by `UncheckedBumperAllocator()` is subject to change in non-breaking releases
+    of AllocArrays.jl in order to tune performance in common cases. An allocator may always be explicitly passed if a particular one is needed.
+
+    The default allocator will always be able to grow to accommodate any allocation rather than be a fixed-size allocator.
 """
 UncheckedBumperAllocator() = UncheckedBumperAllocator(AutoscalingAllocBuffer())
 UncheckedBumperAllocator(n_bytes::Int) = UncheckedBumperAllocator(AllocBuffer(n_bytes))
@@ -214,7 +220,13 @@ end
     BumperAllocator() -> BumperAllocator(AutoscalingAllocBuffer())
     BumperAllocator(n_bytes::Int) -> BumperAllocator(AllocBuffer(n_bytes))
 
-By default uses a growable `AutoscalingAllocBuffer`, or a `AllocBuffer` of `n_bytes` if provided.
+By default uses a growable [`AutoscalingAllocBuffer`](@ref) (currently), or a `AllocBuffer` of `n_bytes` if provided.
+
+!!! note
+    The default allocator used by `UncheckedBumperAllocator()` is subject to change in non-breaking releases
+    of AllocArrays.jl in order to tune performance in common cases. An allocator may be explicitly passed if a particular one is needed.
+
+    The default allocator will always be able to grow to accommodate any allocation rather than be a fixed-size allocator.
 """
 BumperAllocator() = BumperAllocator(AutoscalingAllocBuffer())
 BumperAllocator(n_bytes::Int) = BumperAllocator(AllocBuffer(n_bytes))
