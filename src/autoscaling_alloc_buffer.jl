@@ -113,7 +113,7 @@ function reallocate!(v::AutoscalingAllocBuffer, to_size::Int)
         # so we can start relatively small here at 25%
         v.new_buffer_size = cld(to_size, 4)
     end
-    @debug "[AllocArray.reallocate!] Had $(n_additional_buffers) additional buffers, so reallocated main buffer from $(Base.format_bytes(old_main_buffer_size)) to $(Base.format_bytes(to_size)) in $t seconds. For future additional buffers, set `new_buffer_size` to $(Base.format_bytes(v.new_buffer_size)) (from $(Base.format_bytes(old_new_buffer_size)))."
+    @debug "[AllocArray.reallocate!] Had $(n_additional_buffers) additional buffers. Reallocated main buffer from $(Base.format_bytes(old_main_buffer_size)) to $(Base.format_bytes(to_size)) in $t seconds. For future additional buffers, set `new_buffer_size` to $(Base.format_bytes(v.new_buffer_size)) (from $(Base.format_bytes(old_new_buffer_size)))."
     return nothing
 end
 
