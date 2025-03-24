@@ -25,6 +25,8 @@ using Bumper: alloc!, reset_buffer!
         @test eltype(m) == Float32
         @test size(m) == (100, 100)
     end
+    @test total_capacity(b) > 80n
+    @test amount_used(b) > 80n
     # still not too many additional buffers
     @test length(b.additional_buffers) < 10
 
