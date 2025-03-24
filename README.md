@@ -4,7 +4,7 @@
 [![Coverage](https://codecov.io/gh/ericphanson/AllocArrays.jl/branch/main/graph/badge.svg)](https://codecov.io/gh/ericphanson/AllocArrays.jl)
 [![](https://img.shields.io/badge/docs-dev-blue.svg)](https://ericphanson.github.io/AllocArrays.jl/dev/)
 
-Provides an array type that allows dispatching to a custom allocator rather than using Julia's built-in GC. This allows using allocators following [Bumper.jl](https://github.com/MasonProtter/Bumper.jl)'s interface through code that doesn't know about Bumper.
+Provides an array type that allows dispatching to a custom allocator rather than using Julia's built-in one. Using a new array type allows using allocators following [Bumper.jl](https://github.com/MasonProtter/Bumper.jl)'s interface through code that doesn't know about Bumper, thanks to dispatch.
 
 In particular, AllocArrays.jl provides a wrapper type `AllocArray` which dispatches `similar` dynamically to an allocator depending on the contextual scope (using [ScopedValues.jl](https://github.com/vchuravy/ScopedValues.jl)).
 
