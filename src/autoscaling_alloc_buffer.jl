@@ -6,7 +6,7 @@ mutable struct AutoscalingAllocBuffer
     const additional_buffers::Vector{AllocBuffer{Vector{UInt8}}}
     new_buffer_size::Int
     const total_used_history::Vector{Int}
-    max_history_size::Int
+    const max_history_size::Int
 end
 
 """
