@@ -68,7 +68,7 @@ end
 # Naive use of Bumper.jl
 
 """
-    UncheckedBumperAllocator(b::Union{AllocBuffer,SlabBuffer})
+    UncheckedBumperAllocator(b)
 
 Use with [`with_allocator`](@ref) to dispatch `similar` calls
 for [`AllocArray`](@ref)s to allocate using the buffer `b`,
@@ -104,17 +104,23 @@ end
 12
 ```
 """
-struct UncheckedBumperAllocator{B<:Union{AllocBuffer,SlabBuffer}} <: Allocator
+struct UncheckedBumperAllocator{B} <: Allocator
     buf::B
 end
 
 """
-    UncheckedBumperAllocator() -> UncheckedBumperAllocator(SlabBuffer())
+    UncheckedBumperAllocator() -> UncheckedBumperAllocator(AutoscalingAllocBuffer())
     UncheckedBumperAllocator(n_bytes::Int) -> UncheckedBumperAllocator(AllocBuffer(n_bytes))
 
-By default uses a growable `SlabBuffer`, or a `AllocBuffer` of `n_bytes` if provided.
+By default uses a growable [`AutoscalingAllocBuffer`](@ref) (currently), or a `AllocBuffer` of `n_bytes` if provided.
+
+!!! note
+    The default allocator used by `UncheckedBumperAllocator()` is subject to change in non-breaking releases
+    of AllocArrays.jl in order to tune performance in common cases. An allocator may always be explicitly passed if a particular one is needed.
+
+    The default allocator will always be able to grow to accommodate any allocation rather than be a fixed-size allocator.
 """
-UncheckedBumperAllocator() = UncheckedBumperAllocator(SlabBuffer())
+UncheckedBumperAllocator() = UncheckedBumperAllocator(AutoscalingAllocBuffer())
 UncheckedBumperAllocator(n_bytes::Int) = UncheckedBumperAllocator(AllocBuffer(n_bytes))
 
 """
@@ -160,7 +166,7 @@ end
 #   - every access to a `CheckedAllocArray` uses a read-lock to `MemValid` to ensure the memory is still valid
 
 """
-    BumperAllocator(b::Union{AllocBuffer,SlabBuffer})
+    BumperAllocator(b)
 
 Use with [`with_allocator`](@ref) to dispatch `similar` calls
 for [`AllocArray`](@ref)s and [`CheckedAllocArray`](@ref)s
@@ -206,17 +212,23 @@ struct BumperAllocator{B} <: Allocator
     lock::ReentrantLock
 end
 
-function BumperAllocator(B::T) where T <: Union{AllocBuffer, SlabBuffer}
-    return BumperAllocator(UncheckedBumperAllocator(B), MemValid[], ReentrantLock())
+function BumperAllocator(b)
+    return BumperAllocator(UncheckedBumperAllocator(b), MemValid[], ReentrantLock())
 end
 
 """
-    BumperAllocator() -> BumperAllocator(SlabBuffer())
+    BumperAllocator() -> BumperAllocator(AutoscalingAllocBuffer())
     BumperAllocator(n_bytes::Int) -> BumperAllocator(AllocBuffer(n_bytes))
 
-By default uses a growable `SlabBuffer`, or a `AllocBuffer` of `n_bytes` if provided.
+By default uses a growable [`AutoscalingAllocBuffer`](@ref) (currently), or a `AllocBuffer` of `n_bytes` if provided.
+
+!!! note
+    The default allocator used by `UncheckedBumperAllocator()` is subject to change in non-breaking releases
+    of AllocArrays.jl in order to tune performance in common cases. An allocator may be explicitly passed if a particular one is needed.
+
+    The default allocator will always be able to grow to accommodate any allocation rather than be a fixed-size allocator.
 """
-BumperAllocator() = BumperAllocator(SlabBuffer())
+BumperAllocator() = BumperAllocator(AutoscalingAllocBuffer())
 BumperAllocator(n_bytes::Int) = BumperAllocator(AllocBuffer(n_bytes))
 
 Base.lock(B::BumperAllocator) = lock(B.lock)

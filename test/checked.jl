@@ -24,7 +24,7 @@ end
 
 @testset "basic escape" begin
     input = CheckedAllocArray([1.0])
-    for alloc in (() -> BumperAllocator(2^23), () -> BumperAllocator()) # (8 MiB, SlabBuffer)
+    for alloc in (() -> BumperAllocator(2^23), () -> BumperAllocator()) # (8 MiB, AutoscalingAllocBuffer)
         b = alloc()
         y = with_allocator(b) do
             y = similar(input)
