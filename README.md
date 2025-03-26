@@ -95,15 +95,14 @@ end
 
 # or, given a callable `model`, you can wrap it to obtain another callable model
 # which uses AllocArrays automatically:
-function wrap_model(model; allocator = BumpAllocator(), T=AllocArray)
+function wrap_model(model; allocator = BumperAllocator(), T=AllocArray)
     model_aa = Adapt.adapt(T, model)
     # return a closure over `model_aa` and `allocator`:
     (inputs...; kw...) -> begin
         with_allocator(allocator) do
             try
-                inputs = Adapt.adapt(T, args)
-                ret = Array(model_aa(inputs...; kw...))
-                return ret
+                inputs = Adapt.adapt(T, inputs)
+                return Adapt.adapt(Array, model_aa(inputs...; kw...))
             finally
                 reset!(allocator)
             end
@@ -144,6 +143,6 @@ Note also:
 
 - Just as with all usage of Bumper.jl, the user is responsible for only using `reset!` when newly allocated arrays truly will not escape
   - with AllocArrays this can be slightly more subtle, because within a `with_allocator` with a bump allocator  block, `similar` calls on `AllocArray` or `CheckedAllocArray`s will allocate using the bump allocator. Thus, one must be sure that none of those allocations leak past a `reset!`. The simplest way to do so is to be sure no allocations of any kind escape from a `reset!` block. You can pass in pre-allocated memory and fill that.
-- Using an `UncheckedBumpAllocator` is not safe if allocations may occur concurrently. Since you may not know all the `similar` calls present in the code, this is a-priori dangerous to use.
-- Using `BumpAllocator` provides a semi-safe alternative simply by using a lock to control access to `buf`. In this way, the single buffer `buf` will be used to allocate for all `similar` calls (even across threads/tasks).
+- Using an `UncheckedBumperAllocator` is not safe if allocations may occur concurrently. Since you may not know all the `similar` calls present in the code, this is a-priori dangerous to use.
+- Using `BumperAllocator` provides a semi-safe alternative simply by using a lock to control access to `buf`. In this way, the single buffer `buf` will be used to allocate for all `similar` calls (even across threads/tasks).
     - However, `reset!` must be called outside of the threaded region, since deallocation in the bump allocator (via `reset!`) on one task will interfere with allocations on others.
