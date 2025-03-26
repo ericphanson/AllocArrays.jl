@@ -9,6 +9,33 @@ mutable struct AutoscalingAllocBuffer
     const max_history_size::Int
 end
 
+function Base.show(io::IO, ::MIME"text/plain", b::AutoscalingAllocBuffer)
+    tot_used = Base.format_bytes(amount_used(b))
+    tot_capacity = Base.format_bytes(total_capacity(b))
+
+    if amount_used(b.main_buffer) == amount_used(b) == 0
+        main_buffer_used_str = ""
+    else
+        main_buffer_used = string(round(100 * (amount_used(b.main_buffer) / amount_used(b));
+                                        digits=1), "%")
+        main_buffer_used_str = " [$main_buffer_used in main buffer]"
+    end
+    main_buffer_capacity = string(round(100 *
+                                        (total_capacity(b.main_buffer) / total_capacity(b));
+                                        digits=1), "%")
+
+    print(io, b)
+    if isempty(b.additional_buffers)
+        print(io, " ($tot_used used, capacity $tot_capacity, all in main buffer)")
+    else
+        plural = length(b.additional_buffers) == 1 ? "" : "s"
+        print(io, " ($tot_used used$main_buffer_used_str, capacity $tot_capacity [$main_buffer_capacity in main buffer] with $(length(b.additional_buffers)) additional buffer$plural)")
+    end
+    return nothing
+end
+
+Base.show(io::IO, ::AutoscalingAllocBuffer) = print(io, AutoscalingAllocBuffer, "()")
+
 """
     AutoscalingAllocBuffer(initial_buffer_size::Int=$DEFAULT_INITIAL_BUFFER_SIZE;
                            max_history_size=$DEFAULT_HISTORY_SIZE)
@@ -22,7 +49,6 @@ This means:
 - `AutoscalingAllocBuffer` does not run out of memory (unlike `AllocBuffer`), since new memory will allocated on-demand when necessary
 - for repeated runs of the same size, a single contiguous buffer will be used, which should approximately match the performance of a tuned `AllocBuffer`
 - `AutoscalingAllocBuffer` can reuse allocated memory between runs like `AllocBuffer`, but with safety from overrunning a fixed buffer size and OOMing like `SlabBuffer`. Additionally, `AutoscalingAllocBuffer` separately tracks the memory used by the main buffer vs the additional buffers allocated dynamically, so small unexpected additional allocations don't double the memory consumption (unlike a second slab being allocated).
-
 
 !!! note
     The default `initial_buffer_size` and `max_history_size` are subject to change in non-breaking releases of AllocArrays.jl in order to tune performance in common cases. Additionally, the internal heuristics likewise may change.

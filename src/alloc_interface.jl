@@ -123,6 +123,10 @@ By default uses a growable [`AutoscalingAllocBuffer`](@ref) (currently), or a `A
 UncheckedBumperAllocator() = UncheckedBumperAllocator(AutoscalingAllocBuffer())
 UncheckedBumperAllocator(n_bytes::Int) = UncheckedBumperAllocator(AllocBuffer(n_bytes))
 
+function Base.show(io::IO, b::UncheckedBumperAllocator)
+    return print(io, UncheckedBumperAllocator, "(", b.buf, ")")
+end
+
 """
     reset!(B::UncheckedBumperAllocator)
 
@@ -230,6 +234,22 @@ By default uses a growable [`AutoscalingAllocBuffer`](@ref) (currently), or a `A
 """
 BumperAllocator() = BumperAllocator(AutoscalingAllocBuffer())
 BumperAllocator(n_bytes::Int) = BumperAllocator(AllocBuffer(n_bytes))
+
+function Base.show(io::IO, b::BumperAllocator)
+    # pass through the buf, since we auto-wrap with `UncheckedBumperAllocator` in the constructor,
+    # and that's an implementation detail
+    return print(io, BumperAllocator, "(", b.bumper.buf, ")")
+end
+
+function Base.show(io::IO, ::MIME"text/plain", b::BumperAllocator)
+    print(io, b)
+    # for 3-arg show, we'll add a detail about the memory locations if we are tracking any
+    if length(b.mems) > 0
+        plural = length(b.mems) == 1 ? "" : "s"
+        print(io, " (tracking ", length(b.mems), " CheckedAllocArray memory location$plural)")
+    end
+    return nothing
+end
 
 Base.lock(B::BumperAllocator) = lock(B.lock)
 Base.unlock(B::BumperAllocator) = unlock(B.lock)

@@ -52,4 +52,18 @@ end
     # Constructor does not recurse
     a = AllocArray(1:4)
     @test AllocArray(a).arr === a.arr
+
+    b = BumperAllocator()
+    @test sprint(show, b) == "BumperAllocator(AutoscalingAllocBuffer())"
+    @test sprint(show, MIME"text/plain"(), b) == "BumperAllocator(AutoscalingAllocBuffer())"
+    x = with_allocator(b) do
+        similar(c, 100, 100)
+    end
+    @test sprint(show, b) == "BumperAllocator(AutoscalingAllocBuffer())"
+    @test sprint(show, MIME"text/plain"(), b) == "BumperAllocator(AutoscalingAllocBuffer()) (tracking 1 CheckedAllocArray memory location)"
+
+    b = UncheckedBumperAllocator()
+    @test sprint(show, b) == "UncheckedBumperAllocator(AutoscalingAllocBuffer())"
+    @test sprint(show, MIME"text/plain"(), b) == "UncheckedBumperAllocator(AutoscalingAllocBuffer())"
+
 end
