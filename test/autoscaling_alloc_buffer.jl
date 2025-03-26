@@ -30,6 +30,10 @@ using Bumper: alloc!, reset_buffer!
     # still not too many additional buffers
     @test length(b.additional_buffers) < 10
 
+    @testset "show" begin
+        @test sprint(show, b) == "AutoscalingAllocBuffer()"
+        @test sprint(show, MIME"text/plain"(), b) == "AutoscalingAllocBuffer() (7.668 MiB used [0.0% in main buffer], capacity 9.690 MiB [0.0% in main buffer] with 7 additional buffers)"
+    end
     # now check reset: we should have more capacity than used last time,
     # while having no additional buffers
     used = amount_used(b)
@@ -46,4 +50,10 @@ using Bumper: alloc!, reset_buffer!
         reset_buffer!(b)
     end
     @test total_capacity(b) < 2n
+
+    @testset "show" begin
+        cap = Base.format_bytes(total_capacity(b))
+        @test sprint(show, b) == "AutoscalingAllocBuffer()"
+        @test sprint(show, MIME"text/plain"(), b) == "AutoscalingAllocBuffer() (0 bytes used, capacity $cap, all in main buffer)"
+    end
 end
