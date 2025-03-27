@@ -4,6 +4,7 @@ using ScopedValues: ScopedValue, with
 using Bumper
 using ConcurrentUtilities
 using PrecompileTools
+using Adapt
 
 # Two array types
 export AllocArray
@@ -25,6 +26,7 @@ include("AllocArray.jl")
 include("CheckedAllocArray.jl")
 include("alloc_interface.jl")
 include("autoscaling_alloc_buffer.jl")
+include("adapt.jl")
 
 const CURRENT_ALLOCATOR = ScopedValue{Allocator}(DEFAULT_ALLOCATOR)
 
